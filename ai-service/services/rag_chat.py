@@ -26,8 +26,16 @@ embedding = GoogleGenerativeAIEmbeddings(
 
 # Dökümanlardan vektör veritabanı oluştur (tek seferlik)
 def build_vector_store():
-    loader = TextLoader("data/documents/faq.txt", encoding="utf-8")
-    docs = loader.load()
+    # Çoklu dosyaları buraya ekleyebilirsin
+    file_paths = [
+        "data/documents/faq.txt",
+        "data/documents/policy.txt",
+    ]
+
+    docs = []
+    for path in file_paths:
+        loader = TextLoader(path, encoding="utf-8")
+        docs.extend(loader.load())
 
     splitter = CharacterTextSplitter(chunk_size=500, chunk_overlap=50)
     chunks = splitter.split_documents(docs)
@@ -36,10 +44,12 @@ def build_vector_store():
     vectorstore.save_local("embeddings/vector_store")
 
 
+# Vektör veritabanını yükle
+db = FAISS.load_local("embeddings/vector_store", embedding, allow_dangerous_deserialization=True)
+
+
 # Sorgu için RAG Chatbot (RAG logic burada)
 def rag_chat(user_input: str) -> str:
-    # Vektör veritabanını yükle
-    db = FAISS.load_local("embeddings/vector_store", embedding, allow_dangerous_deserialization=True)
 
     # Kullanıcı mesajına en yakın döküman parçalarını al
     docs = db.similarity_search(user_input, k=3)
