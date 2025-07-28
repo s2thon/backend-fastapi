@@ -1,10 +1,15 @@
 # /chat
 
 from fastapi import APIRouter
+from pydantic import BaseModel
+from services.chatbot import get_chat_response
 
 router = APIRouter(prefix="/chat", tags=["Chatbot"])
 
-@router.post("/")
-def chatbot_response(prompt: str):
-    return {"response": f"You said: {prompt}"}
+class ChatRequest(BaseModel):
+    message: str
 
+@router.post("/")
+def chat(request: ChatRequest):
+    response = get_chat_response(request.message)
+    return {"response": response}
