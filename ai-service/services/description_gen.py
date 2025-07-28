@@ -1,0 +1,1 @@
+# LLM açıklama üretimi
