@@ -1,0 +1,37 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.pyc
+
+# Virtual environment
+venv/
+ENV/
+.env
+.env.*
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# VSCode
+.vscode/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Data and model files
+*.pkl
+*.db
+*.sqlite3
+ai-service/embeddings/vector_store.pkl
+
+# Ignore data folders
+ai-service/data/
+
+# Ignore embeddings folders
+ai-service/embeddings/
