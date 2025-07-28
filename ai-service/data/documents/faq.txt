@@ -1,0 +1,86 @@
+Sık Sorulan Sorular (FAQ)
+
+=== A. Genel Bilgi ===
+
+1. Üyelik gerekli mi?  
+Sipariş verebilmek için kullanıcı hesabı oluşturmanız gerekmektedir. Üyelik ücretsizdir ve e-posta ya da sosyal medya ile hızlı bir şekilde tamamlanabilir.
+
+2. Hangi ödeme yöntemleri kabul ediliyor?  
+Şuanda uygulamamızda yalnızca Stripe ile ödeme kabul edilmektedir. Fakat ileride diğer seçeneklerde mümkün olacaktır.
+
+3. Hangi ülkelere gönderim yapıyorsunuz?  
+Türkiye içi gönderimin yanı sıra belirli Avrupa ülkelerine gönderim sağlamaktayız. Güncel gönderim listesi destek sayfamızda yer almaktadır.
+
+=== B. Sipariş & Teslimat ===
+
+4. Siparişim ne zaman kargoya verilir?  
+Ödeme onaylandıktan sonra 24 saat içinde işleme alınır. Kargo firmalarına teslim süresi 1–3 iş günü arasında değişebilir. Yoğun dönemlerde bu süre 4 iş gününe kadar uzayabilir.
+
+5. Siparişi nasıl takip edebilirim?  
+Siparişiniz kargoya verildiğinde size e-posta veya SMS ile takip numarası gönderilir. Aynı zamanda kullanıcı panelinizden de sipariş durumunuzu görüntüleyebilirsiniz.
+
+6. Siparişi iptal edebilir miyim?  
+Kargoya verilmeden önce kullanıcı panelinden iptal talebi oluşturabilirsiniz. Kargoya verilmiş siparişler için iptal yerine iade süreci işletilir.
+
+=== C. İade & Değişim ===
+
+7. İade süresi ne kadardır?  
+Teslim tarihinden itibaren 14 gün içerisinde iade talep edilebilir.
+
+8. Hangilerinde iade yapılmaz?  
+İndirime girmiş ürünler, kişisel hijyen ürünleri (iç giyim, kulaklık, kozmetik), yazılım lisansları, gıda ürünleri ve sağlık ürünleri iade edilemez.
+
+9. İade süreci nasıl ilerler?  
+   - Kullanıcı panelinden iade talebi oluşturulur.  
+   - Ürün firmamıza ulaştıktan sonra 7 iş günü içinde kontrol edilir.  
+   - Uygun görülen iadeler için ödeme yönteminize bağlı olarak 3–10 iş günü içinde geri ödeme yapılır.
+
+10. Kargo ücreti kimin sorumluluğunda?  
+Standart iadelerde kargo ücreti müşteriye aittir. Ancak hasarlı veya yanlış gönderimlerde kargo ücreti firmamız tarafından karşılanır.
+
+11. Ürün değişimi mümkün mü?  
+Stoğu mevcutsa ürün değişimi yapılabilir. Stoğun tükenmesi durumunda para iadesi uygulanır.
+
+=== D. Ürün Stok & Garanti ===
+
+12. Stok durumu nasıl güncelleniyor?  
+Stoklar gerçek zamanlı olarak güncellenmektedir. Tükendi ürünler “Tükendi” etiketiyle görünür ve satın alınamaz.
+
+13. Ürün hasarlı geldi, ne yapmalıyım?  
+Teslim alırken kontrol ediniz. Hasarlı ürün fotoğrafı ile birlikte 3 gün içinde destek ekibimize başvurarak iade veya değişim talep edebilirsiniz.
+
+14. Garanti şartları nasıl?  
+Elektronik ürünlerde üretici garantisi geçerlidir. Bu ürünlerde garanti bilgisi ürün sayfasında belirtilmiştir. Garanti sürecinde üretici firma yetkili servisi ile iletişime geçilmelidir.
+
+=== E. Fiyatlandırma & Kampanyalar ===
+
+15. Fiyatlar sabit midir?  
+Fiyatlar döviz kuru, stok durumu, kampanyalar ve talep durumuna göre değişkenlik gösterebilir. Ayrıca site içi anlık fiyat karşılaştırma sistemiyle aynı ürünü diğer platformlardaki fiyatlarla karşılaştırabilirsiniz.
+
+16. Kampanyalar veya indirim kuponları sunuluyor mu?  
+Sadakat programları, sezon indirimleri ve kullanıcı bazlı kuponlar düzenli olarak sunulmaktadır. Aktif kampanyalar ödeme aşamasında görüntülenebilir.
+
+=== F. Hediye & Üyelik & Destek ===
+
+17. Hediye paketi seçeneği var mı?  
+Bazı ürünlerde hediye paketi opsiyonu mevcuttur. Bu seçenek ürün detay sayfasında belirtilmiştir.
+
+18. Sadakat programı ya da abonelik sistemi var mı?  
+Yakın gelecekte sadakat programı ve abonelik sistemiyle özel öneriler, indirimler ve ön satışlar sunmayı planlıyoruz.
+
+19. Destek kanalları nelerdir?  
+Uygulamamızda bulunan yapay zeka asistanına istediğiniz soruyu sorabilir, destek alabilirsiniz. Gerekli durumlarda E-posta, canlı sohbet ve panel üzerinden destek hizmeti sunulmaktadır. Ayrıca sık sorulan soruların altında “Canlı Destek” butonu yer almaktadır.
+
+=== G. Güvenlik & Gizlilik ===
+
+20. Kişisel veriler nasıl korunuyor?  
+Kişisel verileriniz GDPR ve KVKK kapsamında güvenle saklanmaktadır. Detaylı bilgi Gizlilik Politikası sayfasında yer almaktadır.
+
+21. Ödeme işlemleri güvenli mi?  
+Sitemiz TLS (SSL) ile korunmakta olup, ödemeler PCI‑DSS uyumlu ödeme sağlayıcıları aracılığıyla gerçekleştirilmekte ve kart bilgileriniz sunucularımızda saklanmamaktadır.
+
+22. Sıkça tercih edilen cihazlar için mobil uygulama var mı?  
+Yakın zamanda iOS ve Android mobil uygulamalarla kullanıcı deneyimini artırmayı planlıyoruz.
+
+23. Yeni ürün ekleyen satıcılar için AI destekli açıklama oluşturma nasıl çalışıyor?  
+Satıcı yeni ürün girdiğinde ürün adını, kategorisini ve birkaç etiketle birlikte AI sistemimize gönderir. AI, SEO uyumlu, okuyucu dostu ve özgün bir ürün açıklaması oluşturur. Ayrıca site dışı platformlardan anlık fiyat karşılaştırması da sağlayabilir.

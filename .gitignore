@@ -30,8 +30,5 @@ Thumbs.db
 *.sqlite3
 ai-service/embeddings/vector_store.pkl
 
-# Ignore data folders
-ai-service/data/
-
 # Ignore embeddings folders
 ai-service/embeddings/

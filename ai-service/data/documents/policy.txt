@@ -1,0 +1,91 @@
+Satın Alma ve İade Politikaları (Policy)
+
+=== 1. Genel Hükümler ===
+
+1.1 Bu politika metni, S2thon Shop üzerinden gerçekleştirilen tüm işlemler için geçerlidir.  
+1.2 Müşteriler, sitemizi kullanarak bu politika hükümlerini kabul etmiş sayılır.  
+1.3 Firma, gerekli durumlarda politikada değişiklik yapma hakkını saklı tutar.
+
+=== 2. Sipariş ve Ödeme Koşulları ===
+
+2.1 Sipariş verebilmek için aktif bir kullanıcı hesabı oluşturulmalıdır.  
+2.2 Ödemeler şu an yalnızca *Stripe* altyapısı ile alınmaktadır. Yakın zamanda ek ödeme yöntemleri de desteklenecektir.  
+2.3 Sipariş, ödeme işlemi tamamlandıktan sonra işleme alınır.  
+2.4 Ödeme sırasında oluşabilecek hatalardan firma sorumlu değildir; kullanıcı ödeme sağlayıcısı ile iletişime geçmelidir.
+
+=== 3. Ürün Hazırlama ve Teslimat ===
+
+3.1 Siparişler ödeme onayından sonra *24 saat* içinde hazırlanır ve 1–3 iş günü içinde kargoya verilir.  
+3.2 Resmi tatiller ve yoğun dönemlerde bu süre *4 iş gününe* kadar uzayabilir.  
+3.3 Teslimatlar anlaşmalı kargo firmalarıyla yapılır ve kullanıcıya SMS/e-posta yoluyla takip numarası iletilir.  
+3.4 Teslimat süresi, alıcının bulunduğu lokasyona göre değişebilir.
+
+=== 4. İade Şartları ===
+
+4.1 Teslimat tarihinden itibaren *14 gün* içinde iade başvurusu yapılabilir.  
+4.2 İade işlemleri, kullanıcı paneli üzerinden başlatılır.  
+4.3 İade için ürünün:  
+ - kullanılmamış,  
+ - orijinal ambalajında,  
+ - eksiksiz (aksesuar, fiş, kutu vs.) olması gereklidir.  
+4.4 İade formu eksiksiz şekilde doldurulmalıdır.  
+4.5 Firma iade talebini reddetme hakkına sahiptir (şartlara uymuyorsa).
+
+=== 5. İade Edilemeyen Ürünler ===
+
+5.1 Aşağıdaki ürünler iade alınmaz:  
+ - İndirimli kampanya ürünleri  
+ - Kişisel hijyen ürünleri (iç giyim, kulaklık, kozmetik, tıraş makinesi vb.)  
+ - Gıda ve sağlık ürünleri  
+ - Dijital içerikler, yazılım lisansları  
+ - Açılmış ambalajlı ürünler  
+ - Kullanım izleri taşıyan ürünler
+
+=== 6. İade Süreci ve Para İadesi ===
+
+6.1 Ürün firmaya ulaştıktan sonra *7 iş günü* içinde kalite kontrolü yapılır.  
+6.2 Uygun görülürse iade işlemi onaylanır ve ödeme:  
+ - Stripe ile yapılmışsa, aynı karta 3–10 iş günü içinde iade edilir.  
+ - Kapıda ödeme veya havale gibi durumlar desteklendiğinde IBAN talep edilir.  
+6.3 Standart iadelerde kargo ücreti müşteriye aittir.  
+6.4 Hasarlı ya da yanlış ürün gönderimlerinde kargo firmamız tarafından karşılanır.
+
+=== 7. Ürün Değişimi ===
+
+7.1 Değişim talebi de iade süreci üzerinden yürütülür.  
+7.2 Ürün stoğu mevcutsa değişim yapılır; stok yoksa iade süreciyle ücret iadesi sağlanır.  
+7.3 Değişimlerde kargo ücretleri kullanıcıya aittir (istisnalar hariç).
+
+=== 8. Garanti ve Teknik Servis ===
+
+8.1 Elektronik ürünlerde *üretici garantisi* geçerlidir.  
+8.2 Garanti süresi ve şartları, ürün açıklamasında belirtilmiştir.  
+8.3 Garanti kapsamındaki ürünlerde kullanıcı, yetkili teknik servise başvurmalıdır.  
+8.4 Garanti dışı hasarlar (kullanıcı kaynaklı kırık, sıvı teması vb.) için ücretli servis uygulanır.
+
+=== 9. Fiyatlandırma ve Stok ===
+
+9.1 Fiyatlar; stok durumu, döviz kuru ve piyasa koşullarına göre değişebilir.  
+9.2 Sistemimizdeki ürün stok bilgileri *gerçek zamanlı* olarak güncellenir.  
+9.3 “Tükendi” olarak işaretlenen ürünler siparişe kapalıdır.  
+9.4 Fiyat karşılaştırma özelliği sayesinde satıcılar, ürünlerini diğer platformlardaki fiyatlara göre optimize edebilir.
+
+=== 10. Gizlilik ve Veri Koruma ===
+
+10.1 Kullanıcı verileri *GDPR* ve *KVKK* kapsamında korunmaktadır.  
+10.2 Kredi kartı bilgileri sunucularımızda *asla saklanmaz*; ödeme sağlayıcısı üzerinden şifreli olarak işlenir.  
+10.3 Gizlilik politikası detayları ilgili sayfada sunulmuştur.
+
+=== 11. Satıcılar İçin AI Özellikleri ===
+
+11.1 Yeni ürün ekleyen satıcılar, ürün adı, kategori ve etiket girerek *AI destekli otomatik açıklama* oluşturabilir.  
+11.2 Bu açıklamalar SEO uyumlu, özgün ve pazarlama odaklıdır.  
+11.3 Ayrıca sistem, ilgili ürünün internetteki diğer fiyatlarını anlık olarak çekerek satıcıya karşılaştırmalı fiyat önerisi sunar.
+
+=== 12. İletişim ===
+
+12.1 Tüm sipariş, iade ve teknik sorularınız için:  
+ - Canlı destek  
+ - Yapay zeka asistanı  
+ - E-posta: destek@seninsiten.com  
+ - Çalışma saatleri: Hafta içi 09:00–18:00
