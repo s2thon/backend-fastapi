@@ -19,10 +19,10 @@ def get_stock_info(product_name: str) -> str:
         cursor = conn.cursor()
 
         query = """
-        SELECT quantity_in_stock
-        FROM product
-        WHERE LOWER(product_name) LIKE %s
-        LIMIT 1
+        SELECT quantity_in_stock 
+        FROM product 
+        WHERE product_name 
+        ILIKE %s LIMIT 1
         """
         cursor.execute(query, (f"%{product_name.lower()}%",))
         result = cursor.fetchone()
@@ -37,3 +37,7 @@ def get_stock_info(product_name: str) -> str:
 
     except Exception as e:
         return f"Veritabanı hatası: {str(e)}"
+
+
+if __name__ == "__main__":
+    print(get_stock_info("iPhone 14 Pro"))

@@ -9,7 +9,7 @@ from langchain_community.document_loaders import TextLoader
 from langchain_community.vectorstores import FAISS
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
 from langchain_text_splitters import CharacterTextSplitter
-from ai_service.services.supabase_client import get_stock_info
+from services.supabase_client import get_stock_info
 
 
 
@@ -29,8 +29,8 @@ embedding = GoogleGenerativeAIEmbeddings(
 # Dökümanlardan vektör veritabanı oluştur (tek seferlik)
 def build_vector_store():
     file_paths = [
-        "ai-service/data/documents/faq.txt",
-        "ai-service/data/documents/policy.txt",
+        "data/documents/faq.txt",
+        "data/documents/policy.txt",
     ]
 
     docs = []
@@ -51,19 +51,25 @@ if not os.path.exists("ai-service/embeddings/vector_store/index.faiss"):
 db = FAISS.load_local("ai-service/embeddings/vector_store", embedding, allow_dangerous_deserialization=True)
 
 
-# ✅ Ürün adını mesajdan çıkart
-def extract_product_name(message: str) -> str:
-    stop_words = ["stok", "stokta", "var mı", "kaldı mı", "ne kadar", "ürün", "adet"]
-    lowered = message.lower()
-    for word in stop_words:
-        lowered = lowered.replace(word, "")
-    return lowered.strip()
+def extract_product_name_with_llm(message: str) -> str:
+    prompt = f"""
+    Aşağıdaki cümleden sadece ve sadece ürünün marka ve model adını çıkar. Başka hiçbir açıklama ekleme.
+
+    Cümle: "{message}"
+
+    Ürün Adı:
+    """
+    try:
+        response = llm.generate_content(prompt)
+        return response.text.strip()
+    except Exception:
+        return "" # Hata durumunda boş döndür
 
 # ✅ Ana RAG fonksiyonu
 def rag_chat(user_input: str) -> str:
     # Supabase kontrolü
     if "stok" in user_input.lower():
-        product_name = extract_product_name(user_input)
+        product_name = extract_product_name_with_llm(user_input)
         if product_name:
             return get_stock_info(product_name)
 
@@ -72,15 +78,15 @@ def rag_chat(user_input: str) -> str:
     context = "\n\n".join(doc.page_content for doc in docs)
 
     prompt = f"""
-Aşağıdaki bilgileri kullanarak kullanıcı sorusunu yanıtla. Bilgiler yetmezse spekülasyon yapma.
+    Aşağıdaki bilgileri kullanarak kullanıcı sorusunu yanıtla. Bilgiler yetmezse spekülasyon yapma.
 
-Bilgi:
-{context}
+    Bilgi:
+    {context}
 
-Soru:
-{user_input}
+    Soru:
+    {user_input}
 
-Cevap:
+    Cevap:
     """
 
     try:
