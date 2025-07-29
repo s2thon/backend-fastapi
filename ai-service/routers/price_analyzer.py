@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 from pydantic import BaseModel
-from services.price_analyzer import analyze_price
+from services.price_analyzer import analyze_product_price
 
 router = APIRouter()
 
@@ -10,4 +10,4 @@ class PriceRequest(BaseModel):
 
 @router.post("/analyze-price")
 def analyze_price_endpoint(req: PriceRequest):
-    return analyze_price(req.product_name, req.price)
+    return analyze_product_price(req)
