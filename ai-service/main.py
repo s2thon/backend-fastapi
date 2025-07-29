@@ -1,13 +1,12 @@
 # FastAPI app
 
 from fastapi import FastAPI
-from routers import description, chatbot, price_analysis_router
+from routers import description, chatbot
 
 app = FastAPI(title="AI Microservice")
 
 app.include_router(description.router)
 app.include_router(chatbot.router)
-app.include_router(price_analysis_router.router)
 
 @app.get("/")
 def read_root():
