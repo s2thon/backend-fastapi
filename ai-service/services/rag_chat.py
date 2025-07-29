@@ -42,13 +42,13 @@ def build_vector_store():
     chunks = splitter.split_documents(docs)
 
     vectorstore = FAISS.from_documents(chunks, embedding)
-    vectorstore.save_local("ai-service/embeddings/vector_store")
+    vectorstore.save_local("../ai-service/embeddings/vector_store")
 
 # Vektör veritabanını yükle (eğer yoksa oluştur)
-if not os.path.exists("ai-service/embeddings/vector_store/index.faiss"):
+if not os.path.exists("../ai-service/embeddings/vector_store/index.faiss"):
     build_vector_store()
 
-db = FAISS.load_local("ai-service/embeddings/vector_store", embedding, allow_dangerous_deserialization=True)
+db = FAISS.load_local("../ai-service/embeddings/vector_store", embedding, allow_dangerous_deserialization=True)
 
 
 def extract_product_name_with_llm(message: str) -> str:
