@@ -24,11 +24,5 @@ Thumbs.db
 # Logs
 *.log
 
-# Data and model files
-*.pkl
-*.db
-*.sqlite3
-ai-service/embeddings/vector_store.pkl
-
 # Ignore embeddings folders
 ai-service/embeddings/
