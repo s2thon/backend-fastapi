@@ -29,6 +29,8 @@ def get_supabase_connection():
         password=os.getenv("PASSWORD")
     )
 
+
+
 def get_stock_info(product_name: str) -> str:
     try:
         conn = get_supabase_connection()
@@ -55,6 +57,34 @@ def get_stock_info(product_name: str) -> str:
         return f"Veritabanı hatası: {str(e)}"
 
 # ... (Mevcut import'larınız ve Supabase istemci kurulumunuz) ...
+
+
+
+def get_price_info(product_name: str) -> int:
+    try:
+        conn = get_supabase_connection()
+        cursor = conn.cursor()
+
+        query = """
+        SELECT price 
+        FROM product 
+        WHERE product_name 
+        ILIKE %s LIMIT 1
+        """
+        cursor.execute(query, (f"%{product_name.lower()}%",))
+        result = cursor.fetchone()
+
+        cursor.close()
+        conn.close()
+
+        if result:
+            return result[0]
+        else:
+            return None
+        
+    except Exception as e:
+        return f"Veritabanı hatası: {str(e)}"
+
 
 def get_or_upload_image_url(base64_data_url: str, file_name: str) -> str:
     """

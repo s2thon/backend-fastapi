@@ -26,6 +26,9 @@ embedding = GoogleGenerativeAIEmbeddings(
     google_api_key=os.getenv("GEMINI_API_KEY")
 )
 
+
+
+
 # Dökümanlardan vektör veritabanı oluştur (tek seferlik)
 def build_vector_store():
     file_paths = [
@@ -51,6 +54,9 @@ if not os.path.exists("../ai-service/embeddings/vector_store/index.faiss"):
 db = FAISS.load_local("../ai-service/embeddings/vector_store", embedding, allow_dangerous_deserialization=True)
 
 
+
+
+
 def extract_product_name_with_llm(message: str) -> str:
     prompt = f"""
     Aşağıdaki cümleden sadece ve sadece ürünün marka ve model adını çıkar. Başka hiçbir açıklama ekleme.
@@ -64,6 +70,9 @@ def extract_product_name_with_llm(message: str) -> str:
         return response.text.strip()
     except Exception:
         return "" # Hata durumunda boş döndür
+
+
+
 
 # ✅ Ana RAG fonksiyonu
 def rag_chat(user_input: str) -> str:
