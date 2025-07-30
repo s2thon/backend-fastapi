@@ -54,31 +54,59 @@ def get_stock_info(product_name: str) -> str:
     except Exception as e:
         return f"Veritabanı hatası: {str(e)}"
 
-def upload_image_from_base64(base64_data_url: str, file_name: str) -> str:
-    """
-    Verilen Base64 data URL'ini çözüp Supabase Storage'a yükler.
-    """
+# ... (Mevcut import'larınız ve Supabase istemci kurulumunuz) ...
 
+def get_or_upload_image_url(base64_data_url: str, file_name: str) -> str:
+    """
+    Verilen 'file_name' ile bir görselin Supabase Storage'da olup olmadığını kontrol eder.
+    - Varsa: Mevcut görselin public URL'ini döndürür.
+    - Yoksa: Verilen Base64 verisini kullanarak görseli yükler ve yeni URL'i döndürür.
+    """
     if not supabase:
         raise ConnectionError("Supabase Storage istemcisi düzgün başlatılamadı.")
 
+    bucket_name = "product-images"
+
     try:
+        # 1. Adım: Dosyanın bucket'ta var olup olmadığını kontrol et
+        # list() metodu, belirtilen yolda arama yapar. Eşleşen dosya varsa dolu bir liste, yoksa boş bir liste döner.
+        existing_files = supabase.storage.from_(bucket_name).list(
+            path="",  # Kök dizinde arama yapmak için boş bırakılır
+            search=file_name
+        )
+
+        if existing_files:
+            # 2. Adım: Dosya zaten var. Yükleme yapma, sadece URL'i al.
+            print(f"✅ Görsel '{file_name}' zaten mevcut. Mevcut URL kullanılıyor.")
+            public_url = supabase.storage.from_(bucket_name).get_public_url(file_name)
+            return public_url
+
+        # 3. Adım: Dosya mevcut değil. Yükleme işlemini gerçekleştir.
+        print(f"🖼️ Görsel '{file_name}' bulunamadı. Yeni yükleme işlemi başlatılıyor...")
+        
         # "data:image/png;base64," kısmını ayıkla
         header, encoded_data = base64_data_url.split(',', 1)
         image_bytes = base64.b64decode(encoded_data)
 
         # 'product-images' bucket'ına resmi yüklüyoruz.
-        supabase.storage.from_("product-images").upload(
-            file=image_bytes, 
-            path=file_name, 
-            file_options={"content-type": "image/png"}
+        supabase.storage.from_(bucket_name).upload(
+            file=image_bytes,
+            path=file_name,
+            file_options={"content-type": "image/png"} # veya header'dan mime type alabilirsiniz
         )
-        
+
         # Yüklenen resmin genel (public) URL'ini alıyoruz.
-        public_url = supabase.storage.from_("product-images").get_public_url(file_name)
-        
-        print(f"✅ Görsel Supabase Storage'a yüklendi. URL: {public_url}")
+        public_url = supabase.storage.from_(bucket_name).get_public_url(file_name)
+
+        print(f"✅ Görsel Supabase Storage'a başarıyla yüklendi. URL: {public_url}")
         return public_url
+
     except Exception as e:
-        print(f"❌ Supabase Storage yükleme hatası: {e}")
-        raise
+        print(f"❌ Supabase Storage işlemi sırasında hata: {e}")
+        # Hata durumunda, belki de dosya zaten var ama başka bir sorun oldu.
+        # Bu durumu daha detaylı ele almak gerekebilir.
+        # Örneğin, 'Duplicate' hatası alırsanız bu da dosyanın var olduğu anlamına gelir.
+        if "Duplicate" in str(e):
+             print("⚠️ Yükleme hatası 'Duplicate' içeriyor. Dosya muhtemelen zaten var. URL yeniden alınıyor.")
+             return supabase.storage.from_(bucket_name).get_public_url(file_name)
+        raise e
