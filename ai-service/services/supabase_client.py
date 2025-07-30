@@ -5,6 +5,7 @@ from supabase import create_client, Client
 import base64
 # Yeni havuz fonksiyonlarımızı import edelim
 from .db_pool import get_db_connection, release_db_connection
+from functools import lru_cache
 
 load_dotenv()
 
@@ -24,6 +25,10 @@ except Exception as e:
 
 
 
+
+# LRU Cache (Least Recently Used Cache) decorator'ı ile fonksiyonu sarmala
+# maxsize: hafızada en fazla kaç sonucu tutacağı
+@lru_cache(maxsize=128)
 def get_stock_info(product_name: str) -> str:
     try:
         conn = get_db_connection()
@@ -55,6 +60,8 @@ def get_stock_info(product_name: str) -> str:
 
 
 
+
+@lru_cache(maxsize=128)
 def get_price_info(product_name: str) -> str:
     """Belirtilen ürünün fiyat bilgisini veritabanından alır ve bir metin olarak döndürür."""
     try:
