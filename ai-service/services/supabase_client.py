@@ -72,7 +72,7 @@ def get_or_upload_image_url(base64_data_url: str, file_name: str) -> str:
         # list() metodu, belirtilen yolda arama yapar. Eşleşen dosya varsa dolu bir liste, yoksa boş bir liste döner.
         existing_files = supabase.storage.from_(bucket_name).list(
             path="",  # Kök dizinde arama yapmak için boş bırakılır
-            search=file_name
+            options={"search": file_name} # HATA BURADA DÜZELTİLDİ
         )
 
         if existing_files:
