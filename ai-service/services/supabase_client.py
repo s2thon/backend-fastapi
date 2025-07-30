@@ -3,6 +3,8 @@ import os
 from dotenv import load_dotenv
 from supabase import create_client, Client
 import base64
+# Yeni havuz fonksiyonlarımızı import edelim
+from .db_pool import get_db_connection, release_db_connection
 
 load_dotenv()
 
@@ -20,20 +22,11 @@ except Exception as e:
     print(f"❌ Supabase istemcisi oluşturulurken hata: {e}")
     supabase = None
 
-def get_supabase_connection():
-    return psycopg2.connect(
-        host=os.getenv("HOST"),
-        port=os.getenv("PORT"),
-        dbname=os.getenv("DBNAME"),
-        user=os.getenv("USER"),
-        password=os.getenv("PASSWORD")
-    )
-
 
 
 def get_stock_info(product_name: str) -> str:
     try:
-        conn = get_supabase_connection()
+        conn = get_db_connection()
         cursor = conn.cursor()
 
         query = """
@@ -46,7 +39,6 @@ def get_stock_info(product_name: str) -> str:
         result = cursor.fetchone()
 
         cursor.close()
-        conn.close()
 
         if result:
             return f"'{product_name}' ürününden stokta {result[0]} adet bulunmaktadır."
@@ -55,14 +47,18 @@ def get_stock_info(product_name: str) -> str:
 
     except Exception as e:
         return f"Veritabanı hatası: {str(e)}"
+    finally:
+        if conn:
+            release_db_connection(conn)
 
 # ... (Mevcut import'larınız ve Supabase istemci kurulumunuz) ...
 
 
 
-def get_price_info(product_name: str) -> int:
+def get_price_info(product_name: str) -> str:
+    """Belirtilen ürünün fiyat bilgisini veritabanından alır ve bir metin olarak döndürür."""
     try:
-        conn = get_supabase_connection()
+        conn = get_db_connection()
         cursor = conn.cursor()
 
         query = """
@@ -75,15 +71,18 @@ def get_price_info(product_name: str) -> int:
         result = cursor.fetchone()
 
         cursor.close()
-        conn.close()
 
-        if result:
-            return result[0]
+        if result and result[0] is not None:
+            # Fiyatı formatlayarak döndürelim
+            return f"'{product_name}' ürününün fiyatı {result[0]:.2f} TL'dir."
         else:
-            return None
+            return f"'{product_name}' ürününün fiyat bilgisi bulunamadı."
         
     except Exception as e:
-        return f"Veritabanı hatası: {str(e)}"
+        return f"Fiyat bilgisi alınırken veritabanı hatası oluştu: {str(e)}"
+    finally:
+        if conn:
+            release_db_connection(conn)
 
 
 def get_or_upload_image_url(base64_data_url: str, file_name: str) -> str:
