@@ -15,6 +15,12 @@ from services.supabase_client import get_stock_info, get_price_info
 
 
 
+generation_config = GenerationConfig(
+    temperature=0.1,
+    max_output_tokens=512,
+)
+
+
 # .env dosyasını yükle
 load_dotenv()
 
@@ -139,7 +145,8 @@ Sen, bir e-ticaret platformunun yardımsever ve profesyonel müşteri hizmetleri
 llm_with_tools = genai.GenerativeModel(
     "gemini-1.5-flash",
     tools=tools,
-    system_instruction=system_instruction # <-- BURAYA EKLİYORUZ
+    system_instruction=system_instruction, # <-- BURAYA EKLİYORUZ
+    generation_config=generation_config
 )
 
 # Fonksiyon adlarını gerçek Python fonksiyonlarıyla eşleştiren bir harita
