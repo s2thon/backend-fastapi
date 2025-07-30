@@ -1,37 +1,43 @@
-import requests
 import os
+import requests
+import base64  # <-- Base64 çevirimi için bu kütüphaneyi import ediyoruz
 from dotenv import load_dotenv
 
 load_dotenv()
-REPLICATE_API_TOKEN = os.getenv("REPLICATE_API_TOKEN")
+STABILITY_KEY = os.getenv("STABILITY_API_KEY")
 
-def generate_product_image(prompt: str):
-    url = "https://api.replicate.com/v1/predictions"
-    headers = {
-        "Authorization": f"Token {REPLICATE_API_TOKEN}",
-        "Content-Type": "application/json",
-    }
-
-    data = {
-        "version": "a9758cbf3c8d4c998b813da9a4f1b3175d31d507c9c6d0b21db52f8f2c3e1f3e",  # sdxl
-        "input": {
-            "prompt": f"{prompt}, product photo, professional e-commerce style, white background",
-            "width": 512,
-            "height": 512,
-            "num_outputs": 1
-        }
-    }
-
-    response = requests.post(url, headers=headers, json=data)
-    prediction = response.json()
-    status_url = prediction["urls"]["get"]
-
-    # Bekle ve sonucu al
-    for _ in range(20):
-        result = requests.get(status_url, headers=headers).json()
-        if result["status"] == "succeeded":
-            return result["output"][0]
-        elif result["status"] == "failed":
-            raise Exception("Image generation failed")
+def create_image_as_base64(prompt: str) -> str:
+    url = "https://api.stability.ai/v2beta/stable-image/generate/core"
     
-    raise TimeoutError("Image generation timed out")
+    headers = {
+        "Authorization": f"Bearer {STABILITY_KEY}",
+        # Accept başlığı artık 'application/json' değil, doğrudan resim verisi beklediğimizi belirtir.
+        "Accept": "image/*"
+    }
+
+    payload = {
+        "prompt": prompt,
+        # 1. output_format'ı API'nin kabul ettiği bir değere değiştiriyoruz. 'png' iyi bir seçim.
+        "output_format": "png", 
+        "model": "stable-diffusion-xl-1.0-v1",
+        "aspect_ratio": "1:1"
+    }
+
+    print("📡 Stability AI'ye MULTIPART/FORM-DATA istek gönderiliyor (yanıt olarak PNG bekleniyor)...")
+    
+    res = requests.post(url, headers=headers, data=payload, files={"none": ""})
+    
+    if res.status_code != 200:
+        print("❌ API ERROR:", res.text)
+        raise Exception(f"Image generation failed with status {res.status_code}: {res.text}")
+
+    # 2. Yanıt artık JSON değil, bu yüzden res.content ile ham (binary) veriyi alıyoruz.
+    image_bytes = res.content
+    
+    # 3. Aldığımız ham byte'ları Base64 formatına kendimiz çeviriyoruz.
+    #    b64encode() byte alır, byte döndürür. Bunu string'e çevirmek için .decode('utf-8') kullanırız.
+    base64_image = base64.b64encode(image_bytes).decode('utf-8')
+    
+    print("✅ Görsel başarıyla alındı ve Base64'e çevrildi.")
+        
+    return f"data:image/png;base64,{base64_image}"
