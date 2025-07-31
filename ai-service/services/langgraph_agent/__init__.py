@@ -10,7 +10,7 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from langgraph.graph import StateGraph, END
 from langgraph.prebuilt import ToolNode
 
-# Kendi oluşturduğumuz modüller
+# Kendi oluşturduğumuz modüller (artık hepsi aynı paketin içinde)
 from .tools import all_tools
 from .nodes import should_continue, call_model
 from .graph_state import GraphState

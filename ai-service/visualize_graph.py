@@ -1,7 +1,7 @@
 # Bu betik, rag_chat_langgraph.py içinde derlenmiş olan 
 # langgraph uygulamasını içe aktarır ve şemasını bir resim dosyası olarak kaydeder.
 
-from services.rag_chat_langgraph import langgraph_app
+from services.langgraph_agent import langgraph_app
 
 try:
     print("🖼️ LangGraph şeması oluşturuluyor...")

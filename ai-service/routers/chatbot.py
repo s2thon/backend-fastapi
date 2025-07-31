@@ -6,7 +6,7 @@ from fastapi.responses import StreamingResponse
 
 # YENİ: Eski rag_chat yerine, yeni langgraph servisini içe aktarıyoruz.
 # Fonksiyon adı da doğal olarak değişti.
-from services.rag_chat_langgraph import run_langgraph_chat_async
+from services.langgraph_agent import run_langgraph_chat_async
 
 # Router'ı tanımlıyoruz
 router = APIRouter(

@@ -104,14 +104,14 @@ def get_price_info(product_name: str) -> str:
     try:
         conn = get_db_connection()
         with conn.cursor() as cursor:
-            query = "SELECT price FROM product WHERE product_name ILIKE %s LIMIT 1"
+            query = "SELECT price FROM product WHERE unaccent(product_name) ILIKE unaccent(%s) LIMIT 1"
             cursor.execute(query, (f'%{product_name}%',))
             result = cursor.fetchone()
             
             if result and result[0] is not None:
                 return f"'{product_name}' ürününün güncel fiyatı {result[0]:.2f} TL'dir."
             else:
-                return f"'{product_name}' adında bir ürün bulunamadı veya fiyat bilgisi mevcut değil."
+                return f"Üzgünüm, sistemimizde '{product_name}' adlı bir ürün bulunamadı veya fiyat bilgisi mevcut değil. Lütfen ürün adını kontrol edip tekrar deneyin veya farklı bir ürün sorgulaması yapın."
     except Exception as e:
         return f"Fiyat bilgisi alınırken bir veritabanı hatası oluştu: {str(e)}"
     finally:
@@ -127,7 +127,7 @@ def get_stock_info(product_name: str) -> str:
     try:
         conn = get_db_connection()
         with conn.cursor() as cursor:
-            query = "SELECT stock_quantity FROM product WHERE product_name ILIKE %s LIMIT 1"
+            query = "SELECT stock_quantity FROM product WHERE unaccent(product_name) ILIKE unaccent(%s) LIMIT 1"
             cursor.execute(query, (f'%{product_name}%',))
             result = cursor.fetchone()
             
@@ -177,9 +177,11 @@ def get_item_status(order_id: int, product_name: str) -> str:
         conn = get_db_connection()
         with conn.cursor() as cursor:
             query = """
-            SELECT oi.item_status FROM order_item AS oi
+            SELECT oi.item_status 
+            FROM order_item AS oi
             JOIN product AS p ON oi.product_id = p.id
-            WHERE oi.order_id = %s AND p.product_name ILIKE %s LIMIT 1;
+            WHERE oi.order_id = %s AND unaccent(p.product_name) ILIKE unaccent(%s)
+            LIMIT 1;
             """
             cursor.execute(query, (order_id, f'%{product_name}%'))
             result = cursor.fetchone()
@@ -204,9 +206,11 @@ def get_refund_status(order_id: int, product_name: str) -> str:
         conn = get_db_connection()
         with conn.cursor() as cursor:
             query = """
-            SELECT oi.refund_status FROM order_item AS oi
+            SELECT oi.refund_status 
+            FROM order_item AS oi
             JOIN product AS p ON oi.product_id = p.id
-            WHERE oi.order_id = %s AND p.product_name ILIKE %s LIMIT 1;
+            WHERE oi.order_id = %s AND unaccent(p.product_name) ILIKE unaccent(%s)
+            LIMIT 1;
             """
             cursor.execute(query, (order_id, f'%{product_name}%'))
             result = cursor.fetchone()
