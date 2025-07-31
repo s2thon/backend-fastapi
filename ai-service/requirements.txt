@@ -10,3 +10,4 @@ faiss-cpu
 pydantic
 beautifulsoup4
 requests
+langgraph

@@ -1,95 +1,233 @@
-import psycopg2
 import os
+import base64
+import psycopg2
+from psycopg2.pool import SimpleConnectionPool
 from dotenv import load_dotenv
 from supabase import create_client, Client
-import base64
-# Yeni havuz fonksiyonlarımızı import edelim
-from .db_pool import get_db_connection, release_db_connection
 from functools import lru_cache
+from urllib.parse import quote_plus
 
+# --- 1. İstemci Başlatma ve Yönetim ---
+
+# .env dosyasındaki ortam değişkenlerini yükle
 load_dotenv()
 
-supabase_url: str = os.environ.get("SUPABASE_URL")
-supabase_key: str = os.environ.get("SUPABASE_KEY")
+# Global değişkenler: Biri veritabanı havuzu, diğeri Supabase'in genel istemcisi için
+db_pool = None
+supabase: Client = None
 
-if not supabase_url or not supabase_key:
-    raise ValueError("SUPABASE_URL ve SUPABASE_KEY .env dosyasında tanımlı olmalı!")
+def initialize_clients():
+    """
+    Uygulama başladığında çalıştırılacak olan her iki istemciyi de başlatır.
+    - Psycopg2 Bağlantı Havuzu: Verimli, doğrudan SQL sorguları için.
+    - Supabase Client: Storage gibi yüksek seviyeli işlemler için.
+    """
+    global db_pool, supabase
 
-try:
-    # Bu 'supabase' nesnesi hem veritabanı hem de depolama için kullanılacak.
-    supabase: Client = create_client(supabase_url, supabase_key)
-    print("✅ Supabase istemcisi (Veritabanı & Depolama) başarıyla oluşturuldu.")
-except Exception as e:
-    print(f"❌ Supabase istemcisi oluşturulurken hata: {e}")
-    supabase = None
+    # --- Psycopg2 Bağlantı Havuzunu Başlat ---
+    if db_pool is None:
+        try:
+            user = os.getenv("USER")
+            password = os.getenv("PASSWORD")
+            host = os.getenv("HOST")
+            port = os.getenv("PORT")
+            dbname = os.getenv("DBNAME")
+
+            if not all([user, password, host, port, dbname]):
+                raise ValueError("USER, PASSWORD, HOST, PORT ve DBNAME .env dosyasında tanımlı olmalı!")
+            
+
+            # --- ANA DÜZELTME BURADA ---
+            # Şifredeki '@' gibi özel karakterleri güvenli formata dönüştür.
+            encoded_password = quote_plus(password)
+
+            db_url = f"postgresql://{user}:{encoded_password}@{host}:{port}/{dbname}"
+
+            db_pool = SimpleConnectionPool(minconn=1, maxconn=10, dsn=db_url)
+            print("✅ Veritabanı bağlantı havuzu (psycopg2) başarıyla başlatıldı.")
+        except (ValueError, psycopg2.Error) as e:
+            print(f"❌ Veritabanı bağlantı havuzu başlatılamadı: {e}")
+            db_pool = None
+
+    # --- Supabase Python İstemcisini Başlat ---
+    if supabase is None:
+        try:
+            supabase_url = os.getenv("SUPABASE_URL")
+            supabase_key = os.getenv("SUPABASE_KEY")
+            if not supabase_url or not supabase_key:
+                raise ValueError("SUPABASE_URL ve SUPABASE_KEY .env dosyasında tanımlı olmalı!")
+            supabase = create_client(supabase_url, supabase_key)
+            print("✅ Supabase istemcisi (Storage için) başarıyla oluşturuldu.")
+        except (ValueError, Exception) as e:
+            print(f"❌ Supabase istemcisi oluşturulurken hata: {e}")
+            supabase = None
 
 
 
 
-# LRU Cache (Least Recently Used Cache) decorator'ı ile fonksiyonu sarmala
-# maxsize: hafızada en fazla kaç sonucu tutacağı
-@lru_cache(maxsize=128)
-def get_stock_info(product_name: str) -> str:
-    try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-
-        query = """
-        SELECT quantity_in_stock 
-        FROM product 
-        WHERE product_name 
-        ILIKE %s LIMIT 1
-        """
-        cursor.execute(query, (f"%{product_name.lower()}%",))
-        result = cursor.fetchone()
-
-        cursor.close()
-
-        if result:
-            return f"'{product_name}' ürününden stokta {result[0]} adet bulunmaktadır."
-        else:
-            return f"'{product_name}' ürünü veritabanında bulunamadı."
-
-    except Exception as e:
-        return f"Veritabanı hatası: {str(e)}"
-    finally:
-        if conn:
-            release_db_connection(conn)
-
-# ... (Mevcut import'larınız ve Supabase istemci kurulumunuz) ...
+def get_db_connection():
+    """Bağlantı havuzundan bir veritabanı bağlantısı alır."""
+    if not db_pool:
+        raise ConnectionError("Veritabanı havuzu başlatılmamış veya kullanılamıyor.")
+    return db_pool.getconn()
 
 
 
+
+def release_db_connection(conn):
+    """Kullanılan bir veritabanı bağlantısını havuza geri bırakır."""
+    if db_pool:
+        db_pool.putconn(conn)
+
+
+
+
+def shutdown_clients():
+    """Uygulama kapandığında tüm bağlantıları ve istemcileri kapatır."""
+    global db_pool, supabase
+    if db_pool:
+        db_pool.closeall()
+        print("ℹ️ Tüm veritabanı bağlantıları kapatıldı.")
+        db_pool = None
+    supabase = None # Supabase istemcisinin özel bir kapatma metodu yoktur.
+    print("ℹ️ Supabase istemcisi temizlendi.")
+
+
+
+
+# --- 2. LangGraph İçin Veritabanı Araç Fonksiyonları (Doğrudan SQL) ---
 
 @lru_cache(maxsize=128)
 def get_price_info(product_name: str) -> str:
-    """Belirtilen ürünün fiyat bilgisini veritabanından alır ve bir metin olarak döndürür."""
+    """Bir ürünün fiyatını veritabanından alır."""
+    conn = None
     try:
         conn = get_db_connection()
-        cursor = conn.cursor()
-
-        query = """
-        SELECT price 
-        FROM product 
-        WHERE product_name 
-        ILIKE %s LIMIT 1
-        """
-        cursor.execute(query, (f"%{product_name.lower()}%",))
-        result = cursor.fetchone()
-
-        cursor.close()
-
-        if result and result[0] is not None:
-            # Fiyatı formatlayarak döndürelim
-            return f"'{product_name}' ürününün fiyatı {result[0]:.2f} TL'dir."
-        else:
-            return f"'{product_name}' ürününün fiyat bilgisi bulunamadı."
-        
+        with conn.cursor() as cursor:
+            query = "SELECT price FROM product WHERE product_name ILIKE %s LIMIT 1"
+            cursor.execute(query, (f'%{product_name}%',))
+            result = cursor.fetchone()
+            
+            if result and result[0] is not None:
+                return f"'{product_name}' ürününün güncel fiyatı {result[0]:.2f} TL'dir."
+            else:
+                return f"'{product_name}' adında bir ürün bulunamadı veya fiyat bilgisi mevcut değil."
     except Exception as e:
-        return f"Fiyat bilgisi alınırken veritabanı hatası oluştu: {str(e)}"
+        return f"Fiyat bilgisi alınırken bir veritabanı hatası oluştu: {str(e)}"
     finally:
         if conn:
             release_db_connection(conn)
+
+
+
+@lru_cache(maxsize=128)
+def get_stock_info(product_name: str) -> str:
+    """Bir ürünün stok adedini veritabanından alır."""
+    conn = None
+    try:
+        conn = get_db_connection()
+        with conn.cursor() as cursor:
+            query = "SELECT stock_quantity FROM product WHERE product_name ILIKE %s LIMIT 1"
+            cursor.execute(query, (f'%{product_name}%',))
+            result = cursor.fetchone()
+            
+            if result and result[0] is not None:
+                if result[0] > 0:
+                    return f"Evet, '{product_name}' ürününden stoklarımızda {result[0]} adet mevcuttur."
+                else:
+                    return f"Üzgünüz, '{product_name}' ürünü şu anda stoklarımızda tükenmiştir."
+            else:
+                return f"'{product_name}' adında bir ürün bulunamadı."
+    except Exception as e:
+        return f"Stok bilgisi alınırken bir veritabanı hatası oluştu: {str(e)}"
+    finally:
+        if conn:
+            release_db_connection(conn)
+
+
+
+@lru_cache(maxsize=128)
+def get_payment_amount(order_id: int) -> str:
+    """Belirtilen sipariş ID'sine ait ödeme tutarını alır."""
+    conn = None
+    try:
+        conn = get_db_connection()
+        with conn.cursor() as cursor:
+            query = "SELECT amount FROM payment WHERE order_id = %s LIMIT 1"
+            cursor.execute(query, (order_id,))
+            result = cursor.fetchone()
+            
+            if result and result[0] is not None:
+                return f"'{order_id}' numaralı siparişin ödeme tutarı {result[0]:.2f} TL'dir."
+            else:
+                return f"'{order_id}' numaralı sipariş için ödeme bilgisi bulunamadı."
+    except Exception as e:
+        return f"Ödeme bilgisi alınırken bir veritabanı hatası oluştu: {str(e)}"
+    finally:
+        if conn:
+            release_db_connection(conn)
+
+
+
+@lru_cache(maxsize=128)
+def get_item_status(order_id: int, product_name: str) -> str:
+    """Belirli bir siparişteki belirli bir ürünün durumunu alır."""
+    conn = None
+    try:
+        conn = get_db_connection()
+        with conn.cursor() as cursor:
+            query = """
+            SELECT oi.item_status FROM order_item AS oi
+            JOIN product AS p ON oi.product_id = p.id
+            WHERE oi.order_id = %s AND p.product_name ILIKE %s LIMIT 1;
+            """
+            cursor.execute(query, (order_id, f'%{product_name}%'))
+            result = cursor.fetchone()
+            
+            if result and result[0]:
+                return f"'{order_id}' numaralı siparişinizdeki '{product_name}' ürününün durumu: {result[0]}."
+            else:
+                return f"'{order_id}' numaralı siparişinizde '{product_name}' adında bir ürün bulunamadı."
+    except Exception as e:
+        return f"Ürün durumu alınırken bir veritabanı hatası oluştu: {str(e)}"
+    finally:
+        if conn:
+            release_db_connection(conn)
+
+
+
+@lru_cache(maxsize=128)
+def get_refund_status(order_id: int, product_name: str) -> str:
+    """Belirli bir siparişteki belirli bir ürünün iade durumunu alır."""
+    conn = None
+    try:
+        conn = get_db_connection()
+        with conn.cursor() as cursor:
+            query = """
+            SELECT oi.refund_status FROM order_item AS oi
+            JOIN product AS p ON oi.product_id = p.id
+            WHERE oi.order_id = %s AND p.product_name ILIKE %s LIMIT 1;
+            """
+            cursor.execute(query, (order_id, f'%{product_name}%'))
+            result = cursor.fetchone()
+            
+            if result and result[0]:
+                return f"'{order_id}' numaralı siparişinizdeki '{product_name}' ürününün iade durumu: {result[0]}."
+            else:
+                return f"'{order_id}' numaralı siparişinizde '{product_name}' ürünü için iade bilgisi bulunamadı."
+    except Exception as e:
+        return f"İade durumu alınırken bir veritabanı hatası oluştu: {str(e)}"
+    finally:
+        if conn:
+            release_db_connection(conn)
+
+# --- 3. Supabase Storage Fonksiyonu (Yüksek Seviye İstemci) ---
+
+
+
+
+
+
 
 
 def get_or_upload_image_url(base64_data_url: str, file_name: str) -> str:
