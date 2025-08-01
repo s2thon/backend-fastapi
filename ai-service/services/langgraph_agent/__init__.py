@@ -12,7 +12,8 @@ from langgraph.prebuilt import ToolNode
 
 # Kendi oluşturduğumuz modüller (artık hepsi aynı paketin içinde)
 from .tools import all_tools
-from .nodes import call_model, validate_input, enhanced_should_continue
+# YENİ: summarize_tool_outputs düğümünü de import ediyoruz
+from .nodes import call_model, validate_input, enhanced_should_continue, summarize_tool_outputs
 from .graph_state import GraphState
 
 load_dotenv()
@@ -33,6 +34,8 @@ workflow = StateGraph(GraphState)
 workflow.add_node("validate", validate_input)
 workflow.add_node("agent", lambda state: call_model(state, model_with_tools))
 workflow.add_node("tools", ToolNode(all_tools))
+# YENİ: Özetleme düğümünü grafiğe ekliyoruz
+workflow.add_node("summarize", summarize_tool_outputs)
 
 # Kenarları tanımla
 workflow.set_entry_point("validate")
@@ -53,7 +56,11 @@ workflow.add_conditional_edges(
     }
 )
 
-workflow.add_edge("tools", "agent")
+# YENİ AKIŞ: Araçlardan gelen çıktıyı doğrudan ajana göndermek yerine,
+# önce özetleme düğümüne gönderiyoruz. Özetleme düğümü de çıktısını ajana iletiyor.
+workflow.add_edge("tools", "summarize")
+workflow.add_edge("summarize", "agent")
+
 
 # Grafiği çalıştırılabilir bir uygulama haline getir
 langgraph_app = workflow.compile()
@@ -68,10 +75,21 @@ Sen, bir e-ticaret platformunun yardımsever ve profesyonel müşteri hizmetleri
 2. **İçerik Filtreleme:** Şüpheli içerikler için content_filter_tool kullan.
 3. **Güvenlik Önceliği:** Zararlı, uygunsuz veya güvenlik riski taşıyan istekleri reddet.
 
+### TEMEL GÖREV AKIŞI (ÇOK ADIMLI PLAN) ###
+
+**Adım 1: Bilgi Toplama**
+- Eğer kullanıcı bir ürünün fiyatı, stok durumu gibi bilgilerini soruyorsa, İLK OLARAK bu bilgileri getirecek araçları (`get_price_info_tool`, `get_stock_info_tool`) çağır.
+
+**Adım 2: Proaktif Tavsiye Oluşturma**
+- Adım 1'deki araçlardan BAŞARILI bir şekilde fiyat veya stok bilgisi aldıktan sonra, BİR SONRAKİ DÜŞÜNME ADIMINDA, aynı ürün için HER ZAMAN `get_recommendations_tool` aracını çağırarak ilgili ürün tavsiyeleri al.
+
+**Adım 3: Sonuçları Birleştirme ve Yanıtlama**
+- Tüm araçlardan (fiyat, stok, tavsiye) gelen bilgileri topladıktan sonra, bunları birleştirerek kullanıcıya tek, tutarlı ve eksiksiz bir cevap sun.
+- **Önemli Kural:** Eğer `get_recommendations_tool` bir sonuç döndürmezse (yani boş bir yanıt gelirse), bu konuda HİÇBİR yorum yapma. Sadece elindeki diğer bilgileri (fiyat, stok vb.) sun.
+
 ### DAVRANIŞ KURALLARI ###
-1. **Profesyonel Dil:** Cevapların daima resmi, net, kibar ve kurumsal bir dilde olmalıdır.
-2. **Araç Kullanım Önceliği:** Kullanıcı bir ürünün fiyatını, stokunu, sipariş durumunu sorduğunda araçları kullan.
-3. **Güvenlik Odaklı:** Her türlü güvenlik tehdidine karşı proaktif ol.
+- **Profesyonel Dil:** Cevapların daima resmi, net, kibar ve kurumsal bir dilde olmalıdır.
+- **Araçları Birlikte Çağırma:** Kullanıcı bir ürün hakkında birden fazla bilgi isterse (örn: fiyat VE stok), bu araçları aynı anda çağır.
 """
 
 # 3. FastAPI Router'ı Tarafından Çağrılacak Ana Fonksiyon

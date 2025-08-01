@@ -63,15 +63,31 @@ def initialize_clients():
             supabase = None
 
 
-
-
 def get_db_connection():
-    """Bağlantı havuzundan bir veritabanı bağlantısı alır."""
+    """
+    Bağlantı havuzundan geçerli bir veritabanı bağlantısı alır.
+    Bağlantının kopuk olup olmadığını kontrol eder ve gerekirse yeniler.
+    """
     if not db_pool:
         raise ConnectionError("Veritabanı havuzu başlatılmamış veya kullanılamıyor.")
-    return db_pool.getconn()
-
-
+    
+    conn = db_pool.getconn()
+    try:
+        # Bağlantının hala canlı olup olmadığını kontrol etmenin en basit yolu
+        # boş bir sorgu çalıştırmaktır.
+        with conn.cursor() as cur:
+            cur.execute("SELECT 1")
+        # Eğer buraya kadar hata almadıysak, bağlantı sağlamdır.
+        return conn
+    except psycopg2.OperationalError:
+        # Bağlantı kopmuş! Havuzdan bu bozuk bağlantıyı kaldır ve yenisini al.
+        print("⚠️ Kopuk veritabanı bağlantısı tespit edildi. Yenileniyor...")
+        db_pool.putconn(conn, close=True) # close=True ile bağlantıyı tamamen kapat
+        return db_pool.getconn() # Yeni bir bağlantı al ve döndür
+    except Exception as e:
+        # Beklenmedik başka bir hata olursa, bağlantıyı geri bırak ve hatayı yükselt
+        release_db_connection(conn)
+        raise e
 
 
 def release_db_connection(conn):
@@ -127,7 +143,7 @@ def get_stock_info(product_name: str) -> str:
     try:
         conn = get_db_connection()
         with conn.cursor() as cursor:
-            query = "SELECT stock_quantity FROM product WHERE unaccent(product_name) ILIKE unaccent(%s) LIMIT 1"
+            query = "SELECT quantity_in_stock FROM product WHERE unaccent(product_name) ILIKE unaccent(%s) LIMIT 1"
             cursor.execute(query, (f'%{product_name}%',))
             result = cursor.fetchone()
             
@@ -225,14 +241,67 @@ def get_refund_status(order_id: int, product_name: str) -> str:
         if conn:
             release_db_connection(conn)
 
+
+@lru_cache(maxsize=128)
+def get_product_recommendations(product_name: str) -> str:
+    """
+    Bir ürüne benzer veya onunla ilişkili diğer ürünleri önerir.
+    Eğer öneri bulunamazsa veya bir hata olursa, boş bir string döndürerek "sessiz" kalır.
+    """
+    conn = None
+    try:
+        conn = get_db_connection()
+        # Hata ayıklama için ekstra log
+        print(f"🔍 Öneri için ürün aranıyor: '{product_name}'")
+        
+        with conn.cursor() as cursor:
+            # 1. Verilen ürünün kategorisini bul
+            query_category = """
+            SELECT category_id FROM product WHERE unaccent(product_name) ILIKE unaccent(%s) LIMIT 1
+            """
+            cursor.execute(query_category, (f'%{product_name}%',))
+            category_result = cursor.fetchone()
+
+            # Ürün veya kategori bulunamazsa sessizce çık
+            if not category_result:
+                print(f"⚠️ Kategori bulunamadı: '{product_name}'")
+                return ""
+
+            category_id = category_result[0]
+            print(f"✅ Kategori bulundu: {category_id}")
+
+            # 2. Aynı kategorideki diğer 3 popüler ürünü bul (kendisi hariç)
+            query_recommendations = """
+            SELECT product_name FROM product 
+            WHERE category_id = %s AND unaccent(product_name) NOT ILIKE unaccent(%s)
+            ORDER BY quantity_in_stock DESC, product_name
+            LIMIT 3;
+            """
+            cursor.execute(query_recommendations, (category_id, f'%{product_name}%'))
+            recommendations = cursor.fetchall()
+
+            # Öneri bulunamazsa sessizce çık
+            if not recommendations:
+                print(f"⚠️ Bu kategoride başka ürün bulunamadı: {category_id}")
+                return ""
+
+            recommended_names = [rec[0] for rec in recommendations]
+            result = f"Bu ürünle ilgilenenler şunları da beğendi: {', '.join(recommended_names)}."
+            print(f"✅ Öneri başarılı: {result}")
+            return result
+
+    except Exception as e:
+        print(f"❌ Ürün önerisi alınırken bir hata oluştu: {str(e)}")
+        return ""
+    finally:
+        if conn:
+            release_db_connection(conn)
+
+
+
+
+
 # --- 3. Supabase Storage Fonksiyonu (Yüksek Seviye İstemci) ---
-
-
-
-
-
-
-
 
 def get_or_upload_image_url(base64_data_url: str, file_name: str) -> str:
     """

@@ -2,7 +2,54 @@
 
 from typing import Literal
 from .graph_state import GraphState
+from langchain_core.messages import ToolMessage, SystemMessage
 
+def summarize_tool_outputs(state: GraphState):
+    """
+    Araçlardan gelen çıktıları akıllıca birleştirir.
+    - Başarılı sonuçları listeler.
+    - "Bulunamadı" veya "tükendi" gibi bilgilendirici ama "başarısız" olmayan sonuçları doğru şekilde ekler.
+    - Tavsiye aracından gelen boş sonuçları tamamen görmezden gelerek sessiz kalmasını sağlar.
+    - Gerçek veritabanı hatalarını belirtir.
+    """
+    messages = state["messages"]
+    
+    # Sadece bu döngüyle ilgili ToolMessage'ları al
+    last_agent_message = next((msg for msg in reversed(messages) if hasattr(msg, 'tool_calls') and msg.tool_calls), None)
+    if not last_agent_message:
+        return {}
+    tool_call_ids = {tc['id'] for tc in last_agent_message.tool_calls}
+    tool_outputs = [msg for msg in messages if isinstance(msg, ToolMessage) and msg.tool_call_id in tool_call_ids]
+    
+    if not tool_outputs:
+        return {}
+
+    summary_lines = []
+    for output in tool_outputs:
+        content = output.content.strip() if output.content else ""
+        tool_name = output.name
+
+        # 1. Tavsiye aracından gelen boş cevabı tamamen yoksay.
+        if tool_name == 'get_recommendations_tool' and not content:
+            continue  # Bu çıktıyı özete hiç ekleme.
+
+        # 2. Gerçek bir veritabanı hatası varsa belirt.
+        if "hatası oluştu" in content:
+            summary_lines.append(f"- {tool_name} kullanılırken bir sorun yaşandı.")
+        # 3. Anlamlı bir sonuç varsa (boş değilse) ekle.
+        #    Bu, "stok tükendi" veya "ürün bulunamadı" gibi geçerli bilgileri de kapsar.
+        elif content:
+            summary_lines.append(f"- {content}")
+
+    # Özetlenecek anlamlı bir bilgi yoksa, sonraki adımı karıştırmamak için boş dön.
+    if not summary_lines:
+        return {}
+
+    summary = "Araçlardan şu bilgiler toplandı:\n" + "\n".join(summary_lines)
+    
+    print(f"📋 Akıllı Özetleme Tamamlandı:\n{summary}")
+
+    return {"messages": [SystemMessage(content=summary)]}
 
 
 def call_model(state: GraphState, model_with_tools):
