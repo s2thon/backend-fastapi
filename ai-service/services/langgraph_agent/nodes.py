@@ -147,14 +147,36 @@ def cache_final_answer(state: GraphState) -> dict:
         
     # 4. Stok aracı kullanılmadıysa, normal önbelleğe alma işlemini yap.
     last_message = state["messages"][-1]
+
+
+    final_content = last_message.content
+
+    # Hata veya olumsuz sonuç belirten anahtar kelimeleri tanımla
+    # Bu liste, önbelleğe alınmasını istemediğimiz durumları kapsar.
+    error_keywords = [
+        "sorun yaşandı",
+        "hata oluştu",
+        "bulunamadı",
+        "başvurun",  # "sistem yöneticisine başvurun" gibi ifadeler için
+        "üzgünüm"   # "Üzgünüm, ... gibi ifadeler için"
+    ]
+
+
     if isinstance(last_message, AIMessage) and last_message.content:
+        if any(keyword in final_content.lower() for keyword in error_keywords):
+            # Ekrana log basarken yanıtın sadece bir kısmını göstererek terminali temiz tutalım.
+            print(f"🚫 Hatalı/olumsuz yanıt önbelleğe alınmayacak: '{final_content[:70]}...'")
+            return {}  # Önbelleğe almadan fonksiyonu sonlandır
+
+        # 4. Yanıt temizse, normal önbelleğe alma işlemini yap
+        # Artık stok kontrolü gibi eski mantıklara gerek yok.
         user_messages = [msg for msg in state["messages"] if isinstance(msg, HumanMessage)]
         if user_messages:
             last_user_query = user_messages[-1].content
             query_hash = generate_query_hash(last_user_query)
-            cache_manager.set(query_hash, last_message.content)
+            cache_manager.set(query_hash, final_content)
             print(f"💾 Önbelleğe eklendi: '{last_user_query}'")
-            
+                
     return {}
 
 

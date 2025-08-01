@@ -32,3 +32,5 @@ ai-service/embeddings/vector_store.pkl
 
 # Ignore embeddings folders
 ai-service/embeddings/
+
+ai-service/faq_cache.json
