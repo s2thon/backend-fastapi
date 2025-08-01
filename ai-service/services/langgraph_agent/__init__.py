@@ -12,7 +12,7 @@ from langgraph.prebuilt import ToolNode
 
 # Kendi oluşturduğumuz modüller (artık hepsi aynı paketin içinde)
 from .tools import all_tools
-from .nodes import should_continue, call_model
+from .nodes import call_model, validate_input, enhanced_should_continue
 from .graph_state import GraphState
 
 load_dotenv()
@@ -26,18 +26,33 @@ model = ChatGoogleGenerativeAI(
 # Modeli, tools.py'dan gelen araçları kullanabilecek şekilde bağla
 model_with_tools = model.bind_tools(all_tools)
 
-# 2. Grafiği Oluştur ve Düğümleri Birleştir
+# 2. Gelişmiş Grafiği Oluştur
 workflow = StateGraph(GraphState)
 
-# Düğümleri ekle:
-# - 'agent' düğümü, modelimizi çağıran fonksiyondur.
-# - 'tools' düğümü, LangGraph'ın hazır aracıdır ve tüm araçlarımızı çalıştırır.
+# Düğümleri ekle
+workflow.add_node("validate", validate_input)
 workflow.add_node("agent", lambda state: call_model(state, model_with_tools))
 workflow.add_node("tools", ToolNode(all_tools))
 
-# Kenarları ve akışı tanımla
-workflow.set_entry_point("agent")
-workflow.add_conditional_edges("agent", should_continue, {"tools": "tools", "end": END})
+# Kenarları tanımla
+workflow.set_entry_point("validate")
+
+# Validasyon sonrası yönlendirme
+workflow.add_conditional_edges(
+    "validate",
+    lambda state: "agent" if not state.get("validation_error") else "end"
+)
+
+# Ana ajan karar verme
+workflow.add_conditional_edges(
+    "agent", 
+    enhanced_should_continue,
+    {
+        "tools": "tools",
+        "end": END
+    }
+)
+
 workflow.add_edge("tools", "agent")
 
 # Grafiği çalıştırılabilir bir uygulama haline getir
@@ -46,12 +61,17 @@ langgraph_app = workflow.compile()
 # Modele kimliğini ve kurallarını öğreten sistem talimatı
 SYSTEM_INSTRUCTION = """
 ### KİMLİK VE GÖREV TANIMI ###
-Sen, bir e-ticaret platformunun yardımsever ve profesyonel müşteri hizmetleri asistanısın. Görevin, kullanıcılardan gelen soruları sana verilen araçları kullanarak doğru bir şekilde yanıtlamaktır.
+Sen, bir e-ticaret platformunun yardımsever ve profesyonel müşteri hizmetleri asistanısın. 
+
+### GÜVENLIK VE VALİDASYON ###
+1. **Girdi Kontrolü:** Kullanıcı mesajlarını her zaman önce validate_user_input_tool ile kontrol et.
+2. **İçerik Filtreleme:** Şüpheli içerikler için content_filter_tool kullan.
+3. **Güvenlik Önceliği:** Zararlı, uygunsuz veya güvenlik riski taşıyan istekleri reddet.
 
 ### DAVRANIŞ KURALLARI ###
-1.  **Profesyonel Dil:** Cevapların daima resmi, net, kibar ve kurumsal bir dilde olmalıdır.
-2.  **Araç Kullanım Önceliği:** Kullanıcı bir ürünün fiyatını, stokunu, sipariş durumunu, iade detayını veya iade/kargo gibi genel politikaları sorduğunda, bu bilgileri tahmin etmek yerine sana verilen araçları ('tools') kullanmak zorundasın.
-3.  **Net ve Odaklı Cevap:** Sadece sorulan soruya odaklan. Araçlardan gelen bilgiyi temiz ve anlaşılır bir şekilde kullanıcıya sun.
+1. **Profesyonel Dil:** Cevapların daima resmi, net, kibar ve kurumsal bir dilde olmalıdır.
+2. **Araç Kullanım Önceliği:** Kullanıcı bir ürünün fiyatını, stokunu, sipariş durumunu sorduğunda araçları kullan.
+3. **Güvenlik Odaklı:** Her türlü güvenlik tehdidine karşı proaktif ol.
 """
 
 # 3. FastAPI Router'ı Tarafından Çağrılacak Ana Fonksiyon

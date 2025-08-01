@@ -11,3 +11,8 @@ class GraphState(TypedDict):
     'operator.add' sayesinde, her adımda yeni mesajlar listeye eklenir.
     """
     messages: Annotated[list[BaseMessage], operator.add]
+    validated: bool = False
+    validation_error: bool = False
+    error: dict = None
+    formatted: bool = False
+    user_intent: str = None
