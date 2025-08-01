@@ -109,53 +109,72 @@ def shutdown_clients():
     print("ℹ️ Supabase istemcisi temizlendi.")
 
 
-
-
-# --- 2. LangGraph İçin Veritabanı Araç Fonksiyonları (Doğrudan SQL) ---
-
 @lru_cache(maxsize=128)
-def get_price_info(product_name: str) -> str:
-    """Bir ürünün fiyatını veritabanından alır."""
+def get_product_details_with_recommendations(product_name: str) -> str:
+    """
+    Bir ürün veya ürünler hakkında detayları bulur. Eğer tek bir ürün bulunursa,
+    onun için aynı kategorideki diğer ürünleri de tavsiye olarak ekler.
+    """
     conn = None
     try:
         conn = get_db_connection()
         with conn.cursor() as cursor:
-            query = "SELECT price FROM product WHERE unaccent(product_name) ILIKE unaccent(%s) LIMIT 1"
-            cursor.execute(query, (f'%{product_name}%',))
-            result = cursor.fetchone()
-            
-            if result and result[0] is not None:
-                return f"'{product_name}' ürününün güncel fiyatı {result[0]:.2f} TL'dir."
-            else:
-                return f"Üzgünüm, sistemimizde '{product_name}' adlı bir ürün bulunamadı veya fiyat bilgisi mevcut değil. Lütfen ürün adını kontrol edip tekrar deneyin veya farklı bir ürün sorgulaması yapın."
-    except Exception as e:
-        return f"Fiyat bilgisi alınırken bir veritabanı hatası oluştu: {str(e)}"
-    finally:
-        if conn:
-            release_db_connection(conn)
+            # Ana sorgu: Ürün detaylarını bul
+            # ÖNCEKİ KODDAKİ HATAYI DÜZELTME: Sorguyu, eski çalışan metodlara benzeterek daha güvenli hale getirelim.
+            # % işaretlerini doğrudan SQL içine değil, execute metoduna parametre olarak veriyoruz.
+            sql_query = """
+                SELECT product_id, product_name, price, quantity_in_stock, category_id 
+                FROM product 
+                WHERE unaccent(product_name) ILIKE %s 
+                ORDER BY product_name
+            """
+            # execute metoduna parametreleri bu şekilde vermek SQL enjeksiyonuna karşı daha güvenlidir.
+            cursor.execute(sql_query, (f'%{product_name}%',))
+            results = cursor.fetchall()
 
+            if not results:
+                return f"'{product_name}' terimiyle eşleşen herhangi bir ürün bulunamadı."
 
+            # Durum 1: Tek bir ürün bulundu -> Tavsiyeleri de ekle
+            if len(results) == 1:
+                prod_id, name, price, stock, cat_id = results[0]
+                price_str = f"{price:.2f} TL" if price is not None else "fiyat bilgisi yok"
+                stock_str = f"stokta {stock} adet bulunmaktadır" if stock > 0 else "stokta tükenmiştir"
+                
+                base_response = f"'{name}' ürününün güncel fiyatı {price_str} olup, ürün şu anda {stock_str}."
 
-@lru_cache(maxsize=128)
-def get_stock_info(product_name: str) -> str:
-    """Bir ürünün stok adedini veritabanından alır."""
-    conn = None
-    try:
-        conn = get_db_connection()
-        with conn.cursor() as cursor:
-            query = "SELECT quantity_in_stock FROM product WHERE unaccent(product_name) ILIKE unaccent(%s) LIMIT 1"
-            cursor.execute(query, (f'%{product_name}%',))
-            result = cursor.fetchone()
-            
-            if result and result[0] is not None:
-                if result[0] > 0:
-                    return f"Evet, '{product_name}' ürününden stoklarımızda {result[0]} adet mevcuttur."
+                # Şimdi tavsiyeleri bulalım
+                rec_query = """
+                    SELECT product_name FROM product 
+                    WHERE category_id = %s AND product_id != %s
+                    ORDER BY quantity_in_stock DESC, product_name
+                    LIMIT 3;
+                """
+                cursor.execute(rec_query, (cat_id, prod_id))
+                recommendations = cursor.fetchall()
+
+                if recommendations:
+                    rec_names = [rec[0] for rec in recommendations]
+                    rec_str = f" Bununla ilgilenenler şunları da beğendi: {', '.join(rec_names)}."
+                    return base_response + rec_str
                 else:
-                    return f"Üzgünüz, '{product_name}' ürünü şu anda stoklarımızda tükenmiştir."
+                    return base_response
+
+            # Durum 2: Birden fazla ürün bulundu -> Sadece listele
             else:
-                return f"'{product_name}' adında bir ürün bulunamadı."
+                product_lines = []
+                for prod_id, name, price, stock, cat_id in results:
+                    price_str = f"{price:.2f} TL" if price is not None else "Fiyat Bilgisi Yok"
+                    stock_str = f"{stock} adet" if stock > 0 else "Tükendi"
+                    product_lines.append(f"- {name}: Fiyatı {price_str}, Stok Durumu: {stock_str}.")
+                
+                formatted_list = "\n".join(product_lines)
+                return f"'{product_name}' aramasıyla eşleşen ürünler şunlardır:\n{formatted_list}"
+
     except Exception as e:
-        return f"Stok bilgisi alınırken bir veritabanı hatası oluştu: {str(e)}"
+        # HATA AYIKLAMA İÇİN KRİTİK EKLEME: Gerçek hatayı terminale yazdır!
+        print(f"\n\n--- VERİTABANI HATASI DETAYI ---\n{e}\n------------------------------\n")
+        return f"Ürün bilgisi alınırken bir veritabanı hatası oluştu. Lütfen sistem yöneticisine başvurun."
     finally:
         if conn:
             release_db_connection(conn)
@@ -240,63 +259,6 @@ def get_refund_status(order_id: int, product_name: str) -> str:
     finally:
         if conn:
             release_db_connection(conn)
-
-
-@lru_cache(maxsize=128)
-def get_product_recommendations(product_name: str) -> str:
-    """
-    Bir ürüne benzer veya onunla ilişkili diğer ürünleri önerir.
-    Eğer öneri bulunamazsa veya bir hata olursa, boş bir string döndürerek "sessiz" kalır.
-    """
-    conn = None
-    try:
-        conn = get_db_connection()
-        # Hata ayıklama için ekstra log
-        print(f"🔍 Öneri için ürün aranıyor: '{product_name}'")
-        
-        with conn.cursor() as cursor:
-            # 1. Verilen ürünün kategorisini bul
-            query_category = """
-            SELECT category_id FROM product WHERE unaccent(product_name) ILIKE unaccent(%s) LIMIT 1
-            """
-            cursor.execute(query_category, (f'%{product_name}%',))
-            category_result = cursor.fetchone()
-
-            # Ürün veya kategori bulunamazsa sessizce çık
-            if not category_result:
-                print(f"⚠️ Kategori bulunamadı: '{product_name}'")
-                return ""
-
-            category_id = category_result[0]
-            print(f"✅ Kategori bulundu: {category_id}")
-
-            # 2. Aynı kategorideki diğer 3 popüler ürünü bul (kendisi hariç)
-            query_recommendations = """
-            SELECT product_name FROM product 
-            WHERE category_id = %s AND unaccent(product_name) NOT ILIKE unaccent(%s)
-            ORDER BY quantity_in_stock DESC, product_name
-            LIMIT 3;
-            """
-            cursor.execute(query_recommendations, (category_id, f'%{product_name}%'))
-            recommendations = cursor.fetchall()
-
-            # Öneri bulunamazsa sessizce çık
-            if not recommendations:
-                print(f"⚠️ Bu kategoride başka ürün bulunamadı: {category_id}")
-                return ""
-
-            recommended_names = [rec[0] for rec in recommendations]
-            result = f"Bu ürünle ilgilenenler şunları da beğendi: {', '.join(recommended_names)}."
-            print(f"✅ Öneri başarılı: {result}")
-            return result
-
-    except Exception as e:
-        print(f"❌ Ürün önerisi alınırken bir hata oluştu: {str(e)}")
-        return ""
-    finally:
-        if conn:
-            release_db_connection(conn)
-
 
 
 
