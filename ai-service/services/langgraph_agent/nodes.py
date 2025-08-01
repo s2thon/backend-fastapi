@@ -1,8 +1,162 @@
 # Bu dosya, grafiğin mantığını içeren düğüm fonksiyonlarını (call_model, should_continue) barındırır.
 
-from typing import Literal
+import json
+from typing import Literal, Dict, Any
+import time
+import re
+import hashlib
+import os
+from typing import Literal, Dict, Any
+from threading import Lock
+
 from .graph_state import GraphState
-from langchain_core.messages import ToolMessage, SystemMessage
+from langchain_core.messages import ToolMessage, SystemMessage, AIMessage, HumanMessage
+
+class PersistentCacheManager:
+    # 1 günlükj cache süresi (TTL) ve maksimum önbellek boyutu
+    # Bu değerler, uygulama başlatıldığında ayarlanır ve değiştirilebilir.
+    # TTL: 86400 saniye (1 gün)
+    # max_size: 100 öğe
+    def __init__(self, cache_file='faq_cache.json', ttl=86400, max_size=100):
+        self.cache_file = cache_file
+        self.ttl = ttl
+        self.max_size = max_size
+        self._cache = self._load_cache()
+        self._lock = Lock()  # Dosya işlemlerini thread-safe yapmak için
+
+    def _load_cache(self) -> dict:
+        """JSON dosyasından önbelleği yükler."""
+        if not os.path.exists(self.cache_file):
+            return {}
+        try:
+            with open(self.cache_file, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except (json.JSONDecodeError, IOError):
+            # Dosya bozuksa veya okunamıyorsa boş bir önbellekle başla
+            return {}
+
+    def _save_cache(self):
+        """Önbelleği JSON dosyasına kaydeder."""
+        with self._lock:
+            try:
+                with open(self.cache_file, 'w', encoding='utf-8') as f:
+                    json.dump(self._cache, f, indent=4)
+            except IOError as e:
+                print(f"❌ Önbellek dosyası yazılamadı: {e}")
+
+    def get(self, key: str) -> Any | None:
+        """Önbellekten bir değer alır ve TTL kontrolü yapar."""
+        if key not in self._cache:
+            return None
+        
+        entry = self._cache[key]
+        cached_response, timestamp = entry['response'], entry['timestamp']
+        
+        # TTL kontrolü - önbellek süresi dolmuş mu?
+        if time.time() - timestamp > self.ttl:
+            print(f"⏳ Önbellek süresi doldu: '{key}'")
+            del self._cache[key]
+            self._save_cache()
+            return None
+            
+        return cached_response
+
+    def set(self, key: str, value: Any):
+        """Önbelleğe yeni bir değer ekler ve boyut kontrolü yapar."""
+        # Önbellek boyut kontrolü
+        if len(self._cache) >= self.max_size and key not in self._cache:
+            # En eski girdiyi bul ve sil
+            oldest_key = min(self._cache.keys(), key=lambda k: self._cache[k]['timestamp'])
+            del self._cache[oldest_key]
+        
+        self._cache[key] = {
+            "response": value,
+            "timestamp": time.time()
+        }
+        self._save_cache()
+
+
+# Bu nesne, uygulama çalıştığı sürece bir kez oluşturulur ve kullanılır.
+cache_manager = PersistentCacheManager()
+
+def normalize_query(query: str) -> str:
+    """
+    Kullanıcı sorgusunu önbellek araması için normalleştir.
+    Noktalama işaretlerini kaldır, lowercase yap.
+    """
+    # Noktalama işaretlerini kaldır
+    normalized = re.sub(r'[^\w\s]', '', query.lower())
+    # Gereksiz boşlukları temizle
+    normalized = " ".join(normalized.split())
+    return normalized
+
+def generate_query_hash(query: str) -> str:
+    """Normalleştirilmiş sorgudan benzersiz bir hash oluştur."""
+    normalized = normalize_query(query)
+    return hashlib.md5(normalized.encode('utf-8')).hexdigest()
+
+def check_cache(state: GraphState) -> dict:
+    """
+    Sık sorulan sorular için önbellek kontrolü.
+    Eğer soru daha önce sorulmuş ve cevabı önbellekte varsa,
+    grafiği LLM'e yönlendirmeden hemen cevabı döndürür.
+    
+    Önbellek hit olursa büyük bir performans ve maliyet kazancı sağlar.
+    """
+    # Son kullanıcı mesajını al
+    last_message = next((msg for msg in reversed(state["messages"]) if hasattr(msg, 'content')), None)
+    if not last_message or not last_message.content or len(last_message.content) < 5:
+        return {}
+    
+    query = last_message.content
+    query_hash = generate_query_hash(query)
+    
+    cached_response = cache_manager.get(query_hash)
+    
+    if cached_response:
+        print(f"🎯 Önbellek HIT: '{query}'")
+        return {
+            "messages": [AIMessage(content=f"{cached_response}")],
+            "cached": True
+        }
+    
+    print(f"❓ Önbellek MISS: '{query}'")
+    return {}
+
+# YENİ: Önbelleğe yazma işini yapan özel bir düğüm
+def cache_final_answer(state: GraphState) -> dict:
+    """
+    Grafiğin sonunda, nihai AI yanıtını önbelleğe alır.
+    """
+
+    # 1. Cevabı oluşturmak için hangi araçların kullanıldığını bul.
+    # Sohbet geçmişinde geriye doğru giderek tool_calls içeren son AIMessage'ı bul.
+    tool_calls = []
+    for message in reversed(state["messages"]):
+        if isinstance(message, AIMessage) and message.tool_calls:
+            tool_calls = message.tool_calls
+            break
+    
+    # 2. Kullanılan araçların isimlerini bir listeye al.
+    called_tool_names = {call['name'] for call in tool_calls}
+    
+    # 3. Eğer stok sorgulama aracı kullanıldıysa, önbelleğe ALMA.
+    if 'get_stock_info_tool' in called_tool_names:
+        print("ℹ️ Yanıt, anlık stok bilgisi içerdiği için önbelleğe alınmayacak.")
+        return {} # Fonksiyonu burada sonlandır.
+        
+    # 4. Stok aracı kullanılmadıysa, normal önbelleğe alma işlemini yap.
+    last_message = state["messages"][-1]
+    if isinstance(last_message, AIMessage) and last_message.content:
+        user_messages = [msg for msg in state["messages"] if isinstance(msg, HumanMessage)]
+        if user_messages:
+            last_user_query = user_messages[-1].content
+            query_hash = generate_query_hash(last_user_query)
+            cache_manager.set(query_hash, last_message.content)
+            print(f"💾 Önbelleğe eklendi: '{last_user_query}'")
+            
+    return {}
+
 
 def summarize_tool_outputs(state: GraphState):
     """
@@ -115,25 +269,22 @@ def validate_input(state: GraphState) -> dict:
         "validation_error": False
     }
 
-def enhanced_should_continue(state: GraphState) -> Literal["tools", "error", "end"]:
+def enhanced_should_continue(state: GraphState) -> Literal["tools", "error", "cache_and_end"]:
     """
     Basitleştirilmiş karar verme mantığı - sadece tools, error, veya end.
     """
-    # Validasyon hatası kontrolü
-    if state.get("validation_error"):
-        return "end"
+    if state.get("cached") or state.get("validation_error"):
+        return "cache_and_end"
     
     last_message = state["messages"][-1]
-    
-    # Hata kontrolü
+
     if state.get("error"):
         return "error"
     
-    # Araç çağrısı gerekli mi?
     if hasattr(last_message, 'tool_calls') and last_message.tool_calls:
         return "tools"
     
-    return "end"
+    return "cache_and_end"
 
 
 

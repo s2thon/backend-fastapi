@@ -12,8 +12,8 @@ from langgraph.prebuilt import ToolNode
 
 # Kendi oluşturduğumuz modüller (artık hepsi aynı paketin içinde)
 from .tools import all_tools
-# YENİ: summarize_tool_outputs düğümünü de import ediyoruz
-from .nodes import call_model, validate_input, enhanced_should_continue, summarize_tool_outputs
+# YENİ: check_cache düğümünü de import ediyoruz
+from .nodes import call_model, validate_input, enhanced_should_continue, summarize_tool_outputs, check_cache, cache_final_answer
 from .graph_state import GraphState
 
 load_dotenv()
@@ -31,14 +31,21 @@ model_with_tools = model.bind_tools(all_tools)
 workflow = StateGraph(GraphState)
 
 # Düğümleri ekle
+workflow.add_node("cache", check_cache)  # YENI: Önbellek kontrolü düğümü
 workflow.add_node("validate", validate_input)
 workflow.add_node("agent", lambda state: call_model(state, model_with_tools))
 workflow.add_node("tools", ToolNode(all_tools))
-# YENİ: Özetleme düğümünü grafiğe ekliyoruz
 workflow.add_node("summarize", summarize_tool_outputs)
+workflow.add_node("cache_and_end", cache_final_answer)
 
-# Kenarları tanımla
-workflow.set_entry_point("validate")
+# Kenarları tanımla - YENİ: Giriş noktası artık 'validate' değil, 'cache'
+workflow.set_entry_point("cache")
+
+# Cache sonrası yönlendirme - YENİ
+workflow.add_conditional_edges(
+    "cache",
+    lambda state: "end" if state.get("cached") else "validate"
+)
 
 # Validasyon sonrası yönlendirme
 workflow.add_conditional_edges(
@@ -52,7 +59,7 @@ workflow.add_conditional_edges(
     enhanced_should_continue,
     {
         "tools": "tools",
-        "end": END
+        "cache_and_end": "cache_and_end"
     }
 )
 
@@ -61,6 +68,7 @@ workflow.add_conditional_edges(
 workflow.add_edge("tools", "summarize")
 workflow.add_edge("summarize", "agent")
 
+workflow.add_edge("cache_and_end", END)
 
 # Grafiği çalıştırılabilir bir uygulama haline getir
 langgraph_app = workflow.compile()
@@ -106,8 +114,22 @@ async def run_langgraph_chat_async(user_input: str):
     }
     # .astream() metodu, yanıtın adımlarını asenkron bir akış olarak almanızı sağlar
     async for output in langgraph_app.astream(inputs):
+        # Akıştan gelen çıktıyı kontrol et. Anahtar, çalışan düğümün adıdır.
+        
+        # Yanıt 'agent' düğümünden mi geliyor? (Önbellek MISS durumu)
         if "agent" in output:
-            last_message = output["agent"]["messages"][-1]
+            agent_output = output["agent"]
             # Sadece modelin son, nihai cevabını (araç çağırmadığı zaman) kullanıcıya gönder
-            if not last_message.tool_calls and last_message.content:
-                yield last_message.content
+            if isinstance(agent_output, dict) and "messages" in agent_output:
+                last_message = agent_output["messages"][-1]
+                if not last_message.tool_calls and last_message.content:
+                    yield last_message.content
+
+        # Yanıt 'cache' düğümünden mi geliyor? (Önbellek HIT durumu)
+        elif "cache" in output:
+            cache_output = output["cache"]
+            # 'cached' bayrağı True ise, bu bir önbellek hitidir ve yanıtı gönderebiliriz.
+            if isinstance(cache_output, dict) and cache_output.get("cached"):
+                last_message = cache_output["messages"][-1]
+                if last_message.content:
+                    yield last_message.content

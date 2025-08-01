@@ -16,3 +16,4 @@ class GraphState(TypedDict):
     error: dict = None
     formatted: bool = False
     user_intent: str = None
+    cached: bool = False
