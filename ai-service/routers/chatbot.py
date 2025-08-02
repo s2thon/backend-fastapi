@@ -1,95 +1,51 @@
-# /chat
+# ai-service/routers/chatbot.py
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from fastapi.responses import StreamingResponse
 
-# YENİ: Eski rag_chat yerine, yeni langgraph servisini içe aktarıyoruz.
-# Fonksiyon adı da doğal olarak değişti.
-from services.langgraph_agent import run_langgraph_chat_async
+# GÜNCELLEME: Güvenlik ve state yönetimi için yeni importlar
+from ..services.langgraph_agent.security import get_current_user_claims, UserClaims
+from ..services.langgraph_agent.graph_state import GraphState
+from ..services.langgraph_agent import run_langgraph_chat_async
+from langchain_core.messages import HumanMessage
 
-# Router'ı tanımlıyoruz
 router = APIRouter(
     prefix="/chat",
-    # GÜNCELLEME: Tag'i, yeni teknolojiyi yansıtacak şekilde daha açıklayıcı hale getirdik.
     tags=["Chatbot (LangGraph)"]
 )
 
-# İstek modelimiz (request body) aynı kalıyor, çünkü hala sadece bir mesaj alıyoruz.
 class ChatRequest(BaseModel):
     message: str
 
-# GÜNCELLEME: Endpoint yolunu, sadece RAG'ı değil, daha genel bir "çağırma"
-# işlemini yansıttığı için '/invoke' olarak değiştirmek daha iyi bir isimlendirmedir.
+# Endpoint artık Spring Boot'tan gelen /api/ai/chat/invoke isteğini karşılayacak
 @router.post("/invoke")
-async def invoke_chat_stream(request: ChatRequest):
+async def invoke_chat_stream(
+    request: ChatRequest,
+    # YENİ: Token'ı doğrulayan ve kullanıcı bilgilerini getiren güvenlik bağımlılığı
+    claims: UserClaims = Depends(get_current_user_claims)
+):
     """
-    Kullanıcı girdisini alır ve LangGraph tabanlı ajan'ı çalıştırır.
-    Cevabı, üretildiği anda parça parça bir metin akışı olarak döndürür.
-    
-    Bu yöntem, LangGraph'ın araçları kullandığı ve düşündüğü süreçte bile
-    kullanıcıya nihai yanıtı hızlıca ulaştırarak mükemmel bir kullanıcı deneyimi sunar.
-    
-    Test etmek için `curl` gibi bir araç kullanın:
-    curl -N -X POST "http://127.0.0.1:8000/chat/invoke" \
-    -H "Content-Type: application/json" \
-    -d '{"message": "iade politikanız nedir?"}'
+    JWT ile kimliği doğrulanmış bir kullanıcının girdisini alır, LangGraph'ı çalıştırır
+    ve cevabı bir akış olarak döndürür. user_id, grafın state'ine eklenir.
     """
     try:
-        # ANA DEĞİŞİKLİK: Çağrılan fonksiyonu yeni LangGraph fonksiyonu ile değiştirdik.
-        # Geri kalan her şey aynı, çünkü her iki fonksiyon da asenkron jeneratör.
+        # GÜNCELLEME: LangGraph'i başlatırken state'e kullanıcı kimliğini ekliyoruz.
+        # Bu, graf içindeki tüm veritabanı sorgularının bu kullanıcıya özel yapılmasını sağlar.
+        initial_state = GraphState(
+            messages=[HumanMessage(content=request.message)],
+            user_id=claims.user_id 
+        )
+
         return StreamingResponse(
-            run_langgraph_chat_async(request.message), 
+            # GÜNCELLEME: Servis fonksiyonu artık mesaj yerine tüm başlangıç state'ini alıyor.
+            run_langgraph_chat_async(initial_state), 
             media_type="text/plain; charset=utf-8"
         )
     except Exception as e:
-        # Olası hataları yakalamak için basit bir hata yönetimi
-        # (Örn: LangGraph servisi bir hata fırlatırsa)
         print(f"Hata - /chat/invoke: {e}")
-        # Hata durumunda tek seferlik bir yanıt döndürebiliriz.
-        # StreamingResponse'a bir hata mesajı listesi de verebiliriz.
         return StreamingResponse(
             ["Üzgünüz, isteğiniz işlenirken bir hata oluştu."], 
             status_code=500,
             media_type="text/plain; charset=utf-8"
         )
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# # --- YENİ VE ÖNERİLEN ENDPOINT ---
-# @router.post("/rag")
-# async def chat_with_context_stream(request: ChatRequest):
-#     """
-#     Kullanıcı girdisini alır ve cevabı bir metin akışı olarak döndürür.
-    
-#     Bu yöntem, LLM'in yanıtı işlenirken kullanıcıya anında geri bildirim 
-#     sağlayarak "hissedilen performansı" ciddi şekilde artırır.
-    
-#     Test etmek için `curl` gibi bir araç kullanın:
-#     curl -N -X POST "http://127.0.0.1:8001/chat/rag_stream" \
-#     -H "Content-Type: application/json" \
-#     -d '{"message": "iPhone 14 Pro fiyatı ne kadar?"}'
-#     """
-#     # rag_chat_async fonksiyonu bir "asenkron jeneratör"dür.
-#     # StreamingResponse, bu jeneratörden gelen her parçayı ("yield" edilen her şeyi)
-#     # yanıt olarak anında istemciye (kullanıcıya) gönderir.
-#     return StreamingResponse(rag_chat_async(request.message), media_type="text/plain; charset=utf-8")

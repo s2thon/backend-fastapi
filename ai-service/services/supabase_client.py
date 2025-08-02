@@ -120,8 +120,6 @@ def get_product_details_with_recommendations(product_name: str) -> str:
         conn = get_db_connection()
         with conn.cursor() as cursor:
             # Ana sorgu: Ürün detaylarını bul
-            # ÖNCEKİ KODDAKİ HATAYI DÜZELTME: Sorguyu, eski çalışan metodlara benzeterek daha güvenli hale getirelim.
-            # % işaretlerini doğrudan SQL içine değil, execute metoduna parametre olarak veriyoruz.
             sql_query = """
                 SELECT product_id, product_name, price, quantity_in_stock, category_id 
                 FROM product 
@@ -181,81 +179,100 @@ def get_product_details_with_recommendations(product_name: str) -> str:
 
 
 
-@lru_cache(maxsize=128)
-def get_payment_amount(order_id: int) -> str:
-    """Belirtilen sipariş ID'sine ait ödeme tutarını alır."""
+# GÜNCELLEME: @lru_cache KESİNLİKLE KALDIRILDI! Farklı kullanıcılar için veri sızıntısı yapardı.
+# GÜNCELLEME: Fonksiyon imzasına 'user_id' eklendi.
+def get_payment_amount(order_id: int, user_id: str) -> str:
+    """Belirtilen sipariş ID'sine ait ödeme tutarını, SADECE o kullanıcı için alır."""
     conn = None
     try:
         conn = get_db_connection()
         with conn.cursor() as cursor:
-            query = "SELECT amount FROM payment WHERE order_id = %s LIMIT 1"
-            cursor.execute(query, (order_id,))
+            # GÜNCELLEME: Sorgu, siparişin doğru kullanıcıya ait olduğunu doğrulamak için 'orders' tablosuyla birleştirildi.
+            # Şemanızdaki 'orders' tablosundaki 'id' ve 'total_numeric' sütunları kullanıldı.
+            query = """
+                SELECT o.total_numeric
+                FROM orders AS o
+                WHERE o.id = %s AND o.user_id = %s
+                LIMIT 1;
+            """
+            cursor.execute(query, (order_id, user_id)) # user_id sorguya eklendi
             result = cursor.fetchone()
             
             if result and result[0] is not None:
-                return f"'{order_id}' numaralı siparişin ödeme tutarı {result[0]:.2f} TL'dir."
+                return f"'{order_id}' numaralı siparişinizin ödeme tutarı {result[0]:.2f} TL'dir."
             else:
-                return f"'{order_id}' numaralı sipariş için ödeme bilgisi bulunamadı."
+                # GÜNCELLEME: Yanıt, kullanıcıya özel hale getirildi.
+                return f"Size ait '{order_id}' numaralı bir sipariş bulunamadı veya ödeme bilgisi mevcut değil."
     except Exception as e:
-        return f"Ödeme bilgisi alınırken bir veritabanı hatası oluştu: {str(e)}"
+        print(f"❌ Veritabanı Hatası (get_payment_amount): {e}")
+        return f"Ödeme bilgisi alınırken bir veritabanı hatası oluştu."
     finally:
         if conn:
             release_db_connection(conn)
 
 
 
-@lru_cache(maxsize=128)
-def get_item_status(order_id: int, product_name: str) -> str:
-    """Belirli bir siparişteki belirli bir ürünün durumunu alır."""
+# GÜNCELLEME: @lru_cache KESİNLİKLE KALDIRILDI!
+# GÜNCELLEME: Fonksiyon imzasına 'user_id' eklendi.
+def get_item_status(order_id: int, product_name: str, user_id: str) -> str:
+    """Belirli bir siparişteki belirli bir ürünün durumunu, SADECE o kullanıcı için alır."""
     conn = None
     try:
         conn = get_db_connection()
         with conn.cursor() as cursor:
+            # GÜNCELLEME: Sorgu, 'orders' tablosuyla birleştirilerek user_id kontrolü eklendi.
             query = """
             SELECT oi.item_status 
             FROM order_item AS oi
-            JOIN product AS p ON oi.product_id = p.id
-            WHERE oi.order_id = %s AND unaccent(p.product_name) ILIKE unaccent(%s)
+            JOIN product AS p ON oi.product_id = p.product_id
+            JOIN orders AS o ON oi.order_id = o.id
+            WHERE o.id = %s AND unaccent(p.product_name) ILIKE unaccent(%s) AND o.user_id = %s
             LIMIT 1;
             """
-            cursor.execute(query, (order_id, f'%{product_name}%'))
+            cursor.execute(query, (order_id, f'%{product_name}%', user_id)) # user_id sorguya eklendi
             result = cursor.fetchone()
             
             if result and result[0]:
                 return f"'{order_id}' numaralı siparişinizdeki '{product_name}' ürününün durumu: {result[0]}."
             else:
-                return f"'{order_id}' numaralı siparişinizde '{product_name}' adında bir ürün bulunamadı."
+                return f"Size ait '{order_id}' numaralı siparişte '{product_name}' adında bir ürün bulunamadı."
     except Exception as e:
-        return f"Ürün durumu alınırken bir veritabanı hatası oluştu: {str(e)}"
+        print(f"❌ Veritabanı Hatası (get_item_status): {e}")
+        return f"Ürün durumu alınırken bir veritabanı hatası oluştu."
     finally:
         if conn:
             release_db_connection(conn)
 
 
 
-@lru_cache(maxsize=128)
-def get_refund_status(order_id: int, product_name: str) -> str:
-    """Belirli bir siparişteki belirli bir ürünün iade durumunu alır."""
+
+# GÜNCELLEME: @lru_cache KESİNLİKLE KALDIRILDI!
+# GÜNCELLEME: Fonksiyon imzasına 'user_id' eklendi.
+def get_refund_status(order_id: int, product_name: str, user_id: str) -> str:
+    """Belirli bir siparişteki belirli bir ürünün iade durumunu, SADECE o kullanıcı için alır."""
     conn = None
     try:
         conn = get_db_connection()
         with conn.cursor() as cursor:
+            # GÜNCELLEME: Sorgu, 'orders' tablosuyla birleştirilerek user_id kontrolü eklendi.
             query = """
             SELECT oi.refund_status 
             FROM order_item AS oi
-            JOIN product AS p ON oi.product_id = p.id
-            WHERE oi.order_id = %s AND unaccent(p.product_name) ILIKE unaccent(%s)
+            JOIN product AS p ON oi.product_id = p.product_id
+            JOIN orders AS o ON oi.order_id = o.id
+            WHERE o.id = %s AND unaccent(p.product_name) ILIKE unaccent(%s) AND o.user_id = %s
             LIMIT 1;
             """
-            cursor.execute(query, (order_id, f'%{product_name}%'))
+            cursor.execute(query, (order_id, f'%{product_name}%', user_id)) # user_id sorguya eklendi
             result = cursor.fetchone()
             
             if result and result[0]:
                 return f"'{order_id}' numaralı siparişinizdeki '{product_name}' ürününün iade durumu: {result[0]}."
             else:
-                return f"'{order_id}' numaralı siparişinizde '{product_name}' ürünü için iade bilgisi bulunamadı."
+                return f"Size ait '{order_id}' numaralı siparişte '{product_name}' ürünü için iade bilgisi bulunamadı."
     except Exception as e:
-        return f"İade durumu alınırken bir veritabanı hatası oluştu: {str(e)}"
+        print(f"❌ Veritabanı Hatası (get_refund_status): {e}")
+        return f"İade durumu alınırken bir veritabanı hatası oluştu."
     finally:
         if conn:
             release_db_connection(conn)
@@ -263,58 +280,35 @@ def get_refund_status(order_id: int, product_name: str) -> str:
 
 
 
-# --- 3. Supabase Storage Fonksiyonu (Yüksek Seviye İstemci) ---
-
+# --- 3. Supabase Storage Fonksiyonu (Yüksek Seviye İstemci) (Bu bölümde değişiklik yok) ---
+# Bu fonksiyon da ileride satıcıya özel (örn: seller_id/dosya_adi.png) hale getirilebilir.
 def get_or_upload_image_url(base64_data_url: str, file_name: str) -> str:
-    """
-    Verilen 'file_name' ile bir görselin Supabase Storage'da olup olmadığını kontrol eder.
-    - Varsa: Mevcut görselin public URL'ini döndürür.
-    - Yoksa: Verilen Base64 verisini kullanarak görseli yükler ve yeni URL'i döndürür.
-    """
+    """Verilen 'file_name' ile bir görseli Supabase Storage'a yükler veya mevcut URL'i döndürür."""
     if not supabase:
         raise ConnectionError("Supabase Storage istemcisi düzgün başlatılamadı.")
 
     bucket_name = "product-images"
-
     try:
-        # 1. Adım: Dosyanın bucket'ta var olup olmadığını kontrol et
-        # list() metodu, belirtilen yolda arama yapar. Eşleşen dosya varsa dolu bir liste, yoksa boş bir liste döner.
-        existing_files = supabase.storage.from_(bucket_name).list(
-            path="",  # Kök dizinde arama yapmak için boş bırakılır
-            options={"search": file_name} # HATA BURADA DÜZELTİLDİ
-        )
-
+        existing_files = supabase.storage.from_(bucket_name).list(path="", options={"search": file_name})
         if existing_files:
-            # 2. Adım: Dosya zaten var. Yükleme yapma, sadece URL'i al.
             print(f"✅ Görsel '{file_name}' zaten mevcut. Mevcut URL kullanılıyor.")
-            public_url = supabase.storage.from_(bucket_name).get_public_url(file_name)
-            return public_url
+            return supabase.storage.from_(bucket_name).get_public_url(file_name)
 
-        # 3. Adım: Dosya mevcut değil. Yükleme işlemini gerçekleştir.
         print(f"🖼️ Görsel '{file_name}' bulunamadı. Yeni yükleme işlemi başlatılıyor...")
-        
-        # "data:image/png;base64," kısmını ayıkla
         header, encoded_data = base64_data_url.split(',', 1)
         image_bytes = base64.b64decode(encoded_data)
-
-        # 'product-images' bucket'ına resmi yüklüyoruz.
+        
         supabase.storage.from_(bucket_name).upload(
             file=image_bytes,
             path=file_name,
-            file_options={"content-type": "image/png"} # veya header'dan mime type alabilirsiniz
+            file_options={"content-type": "image/png"}
         )
-
-        # Yüklenen resmin genel (public) URL'ini alıyoruz.
+        
         public_url = supabase.storage.from_(bucket_name).get_public_url(file_name)
-
         print(f"✅ Görsel Supabase Storage'a başarıyla yüklendi. URL: {public_url}")
         return public_url
-
     except Exception as e:
         print(f"❌ Supabase Storage işlemi sırasında hata: {e}")
-        # Hata durumunda, belki de dosya zaten var ama başka bir sorun oldu.
-        # Bu durumu daha detaylı ele almak gerekebilir.
-        # Örneğin, 'Duplicate' hatası alırsanız bu da dosyanın var olduğu anlamına gelir.
         if "Duplicate" in str(e):
              print("⚠️ Yükleme hatası 'Duplicate' içeriyor. Dosya muhtemelen zaten var. URL yeniden alınıyor.")
              return supabase.storage.from_(bucket_name).get_public_url(file_name)

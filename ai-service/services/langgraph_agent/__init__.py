@@ -5,15 +5,16 @@ import os
 from dotenv import load_dotenv
 
 # LangChain ve LangGraph temel bileşenleri
-from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_core.messages import AIMessage, SystemMessage, BaseMessage
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langgraph.graph import StateGraph, END
-from langgraph.prebuilt import ToolNode
+# from langgraph.prebuilt import ToolNode
 
 # Kendi oluşturduğumuz modüller (artık hepsi aynı paketin içinde)
 from .tools import all_tools
-# YENİ: check_cache düğümünü de import ediyoruz
+# GÜNCELLEME: Yeni ve güvenli araç çalıştırıcı düğümümüzü import ediyoruz.
 from .nodes import all_nodes, enhanced_should_continue
+from .nodes.tool_executor import execute_tools 
 from .graph_state import GraphState
 
 load_dotenv()
@@ -46,8 +47,10 @@ for name, node_function in all_nodes.items():
             lambda state, node_func=node_function: node_func(state)
         )
 
-# ToolNode'u ekle
-workflow.add_node("tools", ToolNode(all_tools))
+# YENİ VE GÜVENLİ YÖNTEMİ EKLİYORUZ:
+# "tools" adındaki düğüm artık, state'ten user_id'yi okuyup güvenli fonksiyonları çağıran
+# bizim özel 'execute_tools' fonksiyonumuzdur.
+workflow.add_node("tools", execute_tools)
 
 # Kenarları tanımla - (Bu kısım aynı kalır)
 workflow.set_entry_point("cache")
@@ -114,35 +117,33 @@ Görevin, kullanıcının sorusunu yanıtlamak için gerekli tüm bilgileri topl
 
 
 # 3. FastAPI Router'ı Tarafından Çağrılacak Ana Fonksiyon
-async def run_langgraph_chat_async(user_input: str):
+# GÜNCELLEME: Fonksiyon artık sadece bir string değil, user_id'yi de içeren tam bir state dict'i alıyor.
+async def run_langgraph_chat_async(initial_state: dict):
     """
     LangGraph uygulamasını çalıştırır ve yanıtları akış halinde döndürür.
-    Sohbeti sistem talimatı ile başlatır.
+    Sohbeti, router'dan gelen başlangıç state'i ve sistem talimatı ile başlatır.
     """
-    inputs = {
-        "messages": [
-            SystemMessage(content=SYSTEM_INSTRUCTION),
-            HumanMessage(content=user_input)
-        ]
-    }
+    inputs = initial_state.copy()
+    inputs["messages"] = [SystemMessage(content=SYSTEM_INSTRUCTION)] + inputs["messages"]
+
+
     # .astream() metodu, yanıtın adımlarını asenkron bir akış olarak almanızı sağlar
     async for output in langgraph_app.astream(inputs):
         # Akıştan gelen çıktıyı kontrol et. Anahtar, çalışan düğümün adıdır.
         
         # Yanıt 'agent' düğümünden mi geliyor? (Önbellek MISS durumu)
-        if "agent" in output:
-            agent_output = output["agent"]
-            # Sadece modelin son, nihai cevabını (araç çağırmadığı zaman) kullanıcıya gönder
-            if isinstance(agent_output, dict) and "messages" in agent_output:
-                last_message = agent_output["messages"][-1]
-                if not last_message.tool_calls and last_message.content:
-                    yield last_message.content
+        for key, value in output.items():
+            if key == "agent" and isinstance(value, dict) and "messages" in value:
+                last_message: BaseMessage = value["messages"][-1]
+                # --- ANA GÜNCELLEME BURADA ---
+                # Yanıtı göndermeden önce, mesajın bir AIMessage olduğundan emin oluyoruz
+                # ve bu mesajın araç çağırmadığını kontrol ediyoruz.
+                if isinstance(last_message, AIMessage) and not last_message.tool_calls:
+                    if last_message.content:
+                        yield last_message.content
 
-        # Yanıt 'cache' düğümünden mi geliyor? (Önbellek HIT durumu)
-        elif "cache" in output:
-            cache_output = output["cache"]
-            # 'cached' bayrağı True ise, bu bir önbellek hitidir ve yanıtı gönderebiliriz.
-            if isinstance(cache_output, dict) and cache_output.get("cached"):
-                last_message = cache_output["messages"][-1]
+            elif key == "cache" and isinstance(value, dict) and value.get("cached"):
+                last_message: BaseMessage = value["messages"][-1]
+                # Önbellekten gelen mesajın içeriği varsa doğrudan gönderilebilir.
                 if last_message.content:
                     yield last_message.content

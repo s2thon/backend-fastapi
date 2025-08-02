@@ -1,7 +1,7 @@
 # Bu dosya, tüm grafiğin paylaştığı durum (hafıza) yapısını tanımlar.
 
 import operator
-from typing import TypedDict, Annotated
+from typing import TypedDict, Annotated, Optional
 from langchain_core.messages import BaseMessage
 
 class GraphState(TypedDict):
@@ -11,6 +11,7 @@ class GraphState(TypedDict):
     'operator.add' sayesinde, her adımda yeni mesajlar listeye eklenir.
     """
     messages: Annotated[list[BaseMessage], operator.add]
+    user_id: Optional[str]
     validated: bool = False
     validation_error: bool = False
     error: dict = None

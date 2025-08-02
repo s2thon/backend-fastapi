@@ -1,13 +1,13 @@
 # FastAPI app
 
 from fastapi import FastAPI
-from routers import description, chatbot, price_analyzer, image_gen
+from .routers import description, chatbot, price_analyzer, image_gen
 
 from contextlib import asynccontextmanager
 
 
 # Rotalarınızı ve veritabanı havuzu fonksiyonlarını import edin
-from services.supabase_client import initialize_clients, shutdown_clients
+from .services.supabase_client import initialize_clients, shutdown_clients
 
 
 @asynccontextmanager
