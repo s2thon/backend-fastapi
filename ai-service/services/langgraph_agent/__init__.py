@@ -13,7 +13,7 @@ from langgraph.prebuilt import ToolNode
 # Kendi oluşturduğumuz modüller (artık hepsi aynı paketin içinde)
 from .tools import all_tools
 # YENİ: check_cache düğümünü de import ediyoruz
-from .nodes import call_model, validate_input, enhanced_should_continue, summarize_tool_outputs, check_cache, cache_final_answer
+from .nodes import all_nodes, enhanced_should_continue
 from .graph_state import GraphState
 
 load_dotenv()
@@ -30,27 +30,38 @@ model_with_tools = model.bind_tools(all_tools)
 # 2. Gelişmiş Grafiği Oluştur
 workflow = StateGraph(GraphState)
 
-# Düğümleri ekle
-workflow.add_node("cache", check_cache)  # YENI: Önbellek kontrolü düğümü
-workflow.add_node("validate", validate_input)
-workflow.add_node("agent", lambda state: call_model(state, model_with_tools))
-workflow.add_node("tools", ToolNode(all_tools))
-workflow.add_node("summarize", summarize_tool_outputs)
-workflow.add_node("cache_and_end", cache_final_answer)
+for name, node_function in all_nodes.items():
+    if name == "agent":
+        # LAMBDA TUZAĞINA KARŞI DÜZELTME:
+        # node_func=node_function, lambda'nın her döngüdeki doğru fonksiyonu
+        # anında yakalamasını sağlar.
+        workflow.add_node(
+            name,
+            lambda state, node_func=node_function: node_func(state, model_with_tools)
+        )
+    else:
+        # Standart düğümler için de aynı güvenlik önlemini almak iyi bir pratiktir.
+        workflow.add_node(
+            name,
+            lambda state, node_func=node_function: node_func(state)
+        )
 
-# Kenarları tanımla - YENİ: Giriş noktası artık 'validate' değil, 'cache'
+# ToolNode'u ekle
+workflow.add_node("tools", ToolNode(all_tools))
+
+# Kenarları tanımla - (Bu kısım aynı kalır)
 workflow.set_entry_point("cache")
 
 # Cache sonrası yönlendirme - YENİ
 workflow.add_conditional_edges(
     "cache",
-    lambda state: "end" if state.get("cached") else "validate"
+    lambda state: END if state.get("cached") else "validate"
 )
 
 # Validasyon sonrası yönlendirme
 workflow.add_conditional_edges(
     "validate",
-    lambda state: "agent" if not state.get("validation_error") else "end"
+    lambda state: END if state.get("validation_error") else "agent"
 )
 
 # Ana ajan karar verme
