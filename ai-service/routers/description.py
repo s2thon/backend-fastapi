@@ -11,7 +11,6 @@ router = APIRouter()
 class Product(BaseModel):
     title: str
     category: str
-    brand: str
 
 @router.post("/generate-description", tags=["Product Description"])
 def gen_desc(
@@ -30,7 +29,6 @@ def gen_desc(
     desc = generate_description(
         product.title, 
         product.category, 
-        product.brand,
         user_id=claims.user_id # <-- Servise user_id'yi de geçin
     )
     return {"description": desc}

@@ -8,7 +8,7 @@ genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 model = genai.GenerativeModel("gemini-1.5-flash")
 
 # GÜNCELLEME: Fonksiyon imzasına 'user_id' eklendi.
-def generate_description(title: str, category: str, brand: str, user_id: str):
+def generate_description(title: str, category: str, user_id: str):
     """
     Verilen ürün bilgileri için yapay zeka kullanarak bir ürün açıklaması oluşturur.
     Artık bu işlemi hangi kullanıcının (satıcının) yaptığını da bilir.
@@ -16,7 +16,6 @@ def generate_description(title: str, category: str, brand: str, user_id: str):
     Args:
         title (str): Ürünün başlığı.
         category (str): Ürünün kategorisi.
-        brand (str): Ürünün markası.
         user_id (str): İşlemi talep eden satıcının kimliği.
     """
     
@@ -27,7 +26,6 @@ def generate_description(title: str, category: str, brand: str, user_id: str):
     prompt = f"""
     Ürün adı: {title}
     Kategori: {category}
-    Marka: {brand}
 
     Yukarıdaki bilgilerle SEO uyumlu, yaratıcı ve ikna edici bir ürün açıklaması yaz.
     """
