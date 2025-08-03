@@ -4,6 +4,7 @@ from ..graph_state import GraphState
 from ....services import supabase_client  # supabase_client.py dosyasını import ediyoruz
 from langchain_core.messages import AIMessage, ToolMessage
 from ..tools.validate_user_input_tool import validate_user_input_tool
+from ..tools.search_documents_tool import search_documents_tool
 
 def execute_tools(state: GraphState) -> dict:
     """
@@ -73,6 +74,15 @@ def execute_tools(state: GraphState) -> dict:
                  response = supabase_client.get_product_details_with_recommendations(
                      product_name=args.get("product_name")
                  )
+
+            # --- YENİ EKLENEN BLOK ---
+            # Agent, "search_documents_tool" aracını çağırdığında bu blok çalışacak.
+            elif tool_name == "search_documents_tool":
+                # 'search_documents_tool' fonksiyonu 'query' adında bir argüman bekliyor.
+                response = search_documents_tool(args.get("query"))
+            # ---------------------------
+
+
             # DİKKAT: Diğer araçlarınız (search_documents_tool vb.) user_id gerektiriyorsa,
             # onları da buraya `elif` bloğu olarak eklemelisiniz.
             else:
