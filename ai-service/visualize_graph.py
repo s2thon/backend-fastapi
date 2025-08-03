@@ -165,9 +165,12 @@ class LangSmithStyleVisualizer:
         dx = x2 - x1
         dy = y2 - y1
         
-        # Özel routing
+        # Özel routing - Back to Agent oku için optimize edilmiş
         if edge_type == "loop":
-            connectionstyle = f'arc3,rad=-0.4'
+            # Kompakt ve zarif kavis - ana akışı bozmayan
+            connectionstyle = f'arc3,rad=-1.1'  # Sıkı ve temiz kavis
+            # Sol üst köşeye daha yakın başlangıç
+            x1 = x1 - 1.2  # Daha kompakt sol çıkış
         elif from_node == "check_cache" and to_node == "cache_answer":
             connectionstyle = f'arc3,rad=-0.8'  # Büyük kavis sol dışarıdan
         elif from_node == "validate_input" and to_node == "end":
@@ -181,7 +184,7 @@ class LangSmithStyleVisualizer:
         # Ok çizimi
         self.ax.annotate('', xy=(x2, y2), xytext=(x1, y1),
                         arrowprops=dict(
-                            arrowstyle='->',
+                            arrowstyle='-|>,head_length=0.7,head_width=0.5',  # İçi dolu büyük üçgen
                             connectionstyle=connectionstyle,
                             color=color,
                             linestyle=linestyle,
@@ -215,11 +218,11 @@ class LangSmithStyleVisualizer:
                     label_x = label_x - 2.8  # Sola taşı
                     label_y = label_y + 2.8  # Biraz yukarı
                 
-                # Özel pozisyonlama: Back to Agent etiketini sola al ve yukarı taşı
+                # Özel pozisyonlama: Back to Agent etiketini kompakt yola uygun ayarla
                 if from_node == "summarize_outputs" and to_node == "call_model" and label == "Back to Agent":
-                    label_x = label_x - 1.0  # Sola al
-                    label_y = label_y + 0.8  # Yukarı taşı
-                
+                    label_x = label_x - 3.5  # Daha sola al
+                    label_y = label_y + 3.9  # Daha yukarı taşı
+
                 # Özel pozisyonlama: Cache Hit etiketini sağa taşı
                 if from_node == "check_cache" and to_node == "cache_answer" and label == "Cache Hit":
                     label_x = label_x + 4.2  # Sağa taşı
@@ -274,9 +277,9 @@ class LangSmithStyleVisualizer:
         self.add_edge_with_line_breaking_label('check_cache', 'cache_answer', 'Cache Hit', 'conditional')
         self.add_edge_with_line_breaking_label('validate_input', 'end', 'Validation Error', 'error')
     
-    def save_visualization(self, filename: str = "langsmith_style_workflow.png",
+    def save_visualization(self, filename: str = "final_langsmith_workflow_v2.png",
                           title: str = "LangGraph AI Assistant Workflow"):
-        """LangSmith stil karanlık tema görselleştirme"""
+        """LangSmith stil karanlık tema görselleştirme - Nihai Versiyon"""
         
         # Grafik ayarları
         self.ax.set_xlim(-7, 7)
@@ -299,7 +302,7 @@ class LangSmithStyleVisualizer:
                                   color='#374151', linewidth=3, alpha=0.3, zorder=0)
         self.ax.add_line(backbone_line)
         
-        # LangSmith stil legend - minimal (title_fontcolor kaldırıldı)
+        # LangSmith stil legend - minimal
         legend_elements = [
             patches.Patch(color='#10B981', label='Start/End'),
             patches.Patch(color='#38BDF8', label='Processing'),
@@ -323,14 +326,14 @@ class LangSmithStyleVisualizer:
         workflow_info = """Main Backbone: START → Cache Check → Validation → AI Model → Decision → END
 Side Paths: Tool Loop (left) • Cache Path (right) • Error Handling"""
         
-        self.ax.text(0, -3, workflow_info, ha='center', va='center',
+        self.ax.text(0, -3.5, workflow_info, ha='center', va='center',
                     fontsize=8, color='#6B7280', style='italic',
                     linespacing=1.4)
         
         # Key Features - küçük font, az dikkat çekici
         key_features = """Cache-first strategy • Input validation & security • AI reasoning with tools • Intelligent summarization • Optimized response flow"""
         
-        self.ax.text(0, -3.7, key_features, ha='center', va='center',
+        self.ax.text(0, -4.0, key_features, ha='center', va='center',
                     fontsize=7, color='#4B5563')
         
         # Kaydet - yüksek kalite
@@ -340,27 +343,27 @@ Side Paths: Tool Loop (left) • Cache Path (right) • Error Handling"""
                    facecolor=self.background_color, edgecolor='none',
                    pad_inches=0.3)
         
-        print(f"🎨 LangSmith-style workflow saved: {output_path}")
-        print(f"🌙 Dark mode theme applied")
-        print(f"✨ Line-breaking labels integrated")
-        print(f"🎯 SaaS monitoring interface aesthetic achieved")
+        print(f"🎨 Final LangSmith-style workflow saved: {output_path}")
+        print(f"🌙 Dark mode theme perfected")
+        print(f"✨ Compact Back to Agent arrow optimized")
+        print(f"🎯 Professional presentation-ready quality achieved")
         plt.show()
         return output_path
 
 def main():
     """Ana fonksiyon"""
-    print("🌙 LangSmith-Style Dark Mode Workflow Visualizer")
-    print("=" * 55)
-    print("🎨 Creating modern SaaS monitoring interface aesthetic")
-    print("✨ Applying line-breaking label technique")
-    print("🎯 Professional dark theme with neon-pastel colors")
+    print("🌙 Final LangSmith-Style Dark Mode Workflow Visualizer")
+    print("=" * 60)
+    print("🎨 Creating presentation-ready SaaS monitoring interface")
+    print("✨ Optimizing Back to Agent arrow for perfect balance")
+    print("🎯 Professional dark theme with perfect visual hierarchy")
     print()
     
     try:
         visualizer = LangSmithStyleVisualizer()
         visualizer.create_langsmith_workflow()
         path = visualizer.save_visualization()
-        print(f"🎉 Successfully created LangSmith-style workflow: {path}")
+        print(f"🎉 Successfully created FINAL LangSmith-style workflow: {path}")
         
     except Exception as e:
         print(f"❌ Error: {e}")
