@@ -31,6 +31,8 @@ model_with_tools = model.bind_tools(all_tools)
 # 2. Gelişmiş Grafiği Oluştur
 workflow = StateGraph(GraphState)
 
+
+
 for name, node_function in all_nodes.items():
     if name == "agent":
         # LAMBDA TUZAĞINA KARŞI DÜZELTME:
@@ -52,22 +54,31 @@ for name, node_function in all_nodes.items():
 # bizim özel 'execute_tools' fonksiyonumuzdur.
 workflow.add_node("tools", execute_tools)
 
-# Kenarları tanımla - (Bu kısım aynı kalır)
+
+# --- GRAF AKIŞINI TAMAMEN YENİDEN YAPIYORUZ ---
+
+# 1. GİRİŞ NOKTASI: Her zaman önce önbelleği kontrol et.
 workflow.set_entry_point("cache")
 
-# Cache sonrası yönlendirme - YENİ
+
+# 2. Önbellek Sonrası: Eğer önbellekte varsa (HIT), bitir. Yoksa (MISS), validasyona git.
 workflow.add_conditional_edges(
     "cache",
     lambda state: END if state.get("cached") else "validate"
 )
 
-# Validasyon sonrası yönlendirme
+# 3. Validasyon Sonrası: Eğer hata varsa, bitir. Yoksa, ŞİMDİ zorunlu RAG aramasını yap.
 workflow.add_conditional_edges(
     "validate",
     lambda state: END if state.get("validation_error") else "agent"
 )
 
-# Ana ajan karar verme
+
+
+
+# 5. Agent Karar Anı: Agent, elindeki RAG sonucuna göre karar verir.
+#    - Ya cevap yeterlidir ve sonlandırır.
+#    - Ya da ek bilgi (örn: ürün detayı) için başka bir araç kullanır.
 workflow.add_conditional_edges(
     "agent", 
     enhanced_should_continue,
@@ -77,51 +88,36 @@ workflow.add_conditional_edges(
     }
 )
 
-# YENİ AKIŞ: Araçlardan gelen çıktıyı doğrudan ajana göndermek yerine,
+
+
+# 6. Standart Araç Döngüsü: Bu kısım, ikincil araçlar (örn: get_product_details) için kullanılır.
 # önce özetleme düğümüne gönderiyoruz. Özetleme düğümü de çıktısını ajana iletiyor.
 workflow.add_edge("tools", "summarize")
 workflow.add_edge("summarize", "agent")
 
 workflow.add_edge("cache_and_end", END)
 
+
+
 # Grafiği çalıştırılabilir bir uygulama haline getir
 langgraph_app = workflow.compile()
 
+
+
 # Modele kimliğini ve kurallarını öğreten sistem talimatı
 SYSTEM_INSTRUCTION = """
-### KİMLİK VE GÖREV TANIMI ###
-Sen, bir e-ticaret platformunun yardımsever ve profesyonel bir müşteri hizmetleri asistanısın. 
-Görevin, kullanıcının sorusunu analiz etmek, doğru aracı kullanarak gerekli bilgileri toplamak ve ardından bu bilgileri tek bir, tutarlı cevapta birleştirmektir.
+### TEMEL KURAL ###
+Senin TEK bir görevin var: Kullanıcının sorusunu analiz edip doğru aracı seçmek.
+Aşağıdaki iki seçenekten birini UYGULAMAK ZORUNDASIN:
 
-### GÜVENLIK VE VALİDASYON ###
-- Kullanıcı mesajlarını her zaman önce `validate_user_input_tool` ile kontrol et.
-- Zararlı veya uygunsuz istekleri her zaman reddet.
+**Seçenek 1 (Spesifik Ürün Sorgusu):**
+- **EĞER** kullanıcı mesajı, 'iPhone' veya 'MacBook' veya 'Playstation' gibi spesifik ve tanınabilir bir ürün adı içeriyorsa, **O ZAMAN** `get_product_details_tool` aracını çağır.
 
-### TEMEL GÖREV AKIŞI ###
+**Seçenek 2 (Diğer Tüm Durumlar - Varsayılan):**
+- **EĞER** kullanıcı mesajı yukarıdaki kurala uymuyorsa, yani spesifik bir ürün adı İÇERMİYORSA, o zaman bu soru bir politika veya genel bir sorudur. Bu durumda **MUTLAKA** `search_documents_tool` aracını kullanmalısın.
+- "Fiyatlandırma", "Stok", "İade", "Kargo", "Garanti" gibi genel kavramlar her zaman bu seçeneğe girer.
 
-**Adım 1: Soruyu Sınıflandır ve Bilgiyi Topla**
-- Kullanıcının sorusunu dikkatlice analiz et. Sorunun doğasına göre aşağıdaki araçlardan **yalnızca BİRİNİ** seç:
-
-  - **Seçenek A: Genel Soru veya Şirket Politikası**
-    - Eğer soru; iade, ürün değişimi, kargo süreci, teslimat, garanti şartları veya sıkça sorulan diğer genel konularla ilgiliyse, cevabı bulmak için **MUTLAKA** `search_documents_tool` aracını kullan. 
-    - Bu aracı kullandıktan sonra başka bir araca (ürün veya tavsiye) ihtiyaç YOKTUR. Doğrudan Adım 3'e geç.
-
-  - **Seçenek B: Spesifik Ürün Sorgusu**
-    - Eğer kullanıcı belirli bir ürün hakkında (fiyat, stok, özellik vb.) bilgi istiyorsa, ilk görevin **HER ZAMAN** `get_product_info_tool` aracını kullanarak o ürünün temel bilgilerini almaktır.
-    - Bu seçeneği seçtiysen, Adım 2'ye devam et.
-
-**Adım 2: Proaktif Olarak Tavsiye Al (Sadece Ürün Sorguları İçin)**
-- Eğer Adım 1'de `get_product_info_tool` aracını kullandıysan ve bu araç **tek bir ürün hakkında** bilgi verdiyse (bir liste veya tablo değil), o zaman ikinci görevin, **BİR SONRAKİ DÜŞÜNME ADIMINDA**, aynı ürün için `get_recommendations_tool` aracını çağırarak ilgili başka ürünler hakkında tavsiye almaktır.
-
-**Adım 3: Tüm Bilgileri Birleştir ve Yanıtla (Nihai Adım)**
-- Gerekli tüm araçları çağırdıktan ve elindeki tüm bilgileri (genel politika bilgisi VEYA temel ürün bilgisi + tavsiyeler) topladıktan sonra, bu bilgileri birleştirerek kullanıcıya kibar ve eksiksiz bir nihai cevap oluştur.
-- **Örnek Ürün Yanıtı Formatı:** "[Temel ürün bilgisi cümlesi]. Bununla ilgilenenler şunları da beğendi: [tavsiye edilen ürünler]."
-- **Örnek Politika Yanıtı Formatı:** "[search_documents_tool'dan gelen cevap]."
-
-### ÖNEMLİ KURALLAR ###
-- Şirket politikaları hakkında asla kendi bilgine dayanarak cevap verme. Her zaman `search_documents_tool`'dan gelen bilgiyi kullan.
-- Eğer `get_recommendations_tool` bir sonuç döndürmezse, tavsiyelerden hiç bahsetme. Sadece elindeki diğer bilgileri sun.
-- Kullanıcıya asla bir aracın ham çıktısını doğrudan gösterme. Her zaman bilgileri birleştirip düzgün bir cümle haline getir.
+Bu iki kuralın dışında bir varsayımda bulunma. Bir soru spesifik bir ürün adı içermiyorsa, cevap her zaman belgelerdedir.
 """
 
 
@@ -157,3 +153,15 @@ async def run_langgraph_chat_async(initial_state: dict):
                 # Önbellekten gelen mesajın içeriği varsa doğrudan gönderilebilir.
                 if last_message.content:
                     yield last_message.content
+
+            # --- YENİ EKLENEN BLOK ---
+            # 'validate' düğümünden bir çıktı geldi mi diye kontrol et.
+            elif key == "validate" and isinstance(value, dict) and value.get("validation_error"):
+                # Eğer 'validation_error' True ise, biliyoruz ki 'validate_input' düğümü
+                # 'messages' listesine bir hata mesajı eklemiştir.
+                last_message: BaseMessage = value["messages"][-1]
+                
+                # Bu hata mesajının içeriğini alıp frontend'e gönder.
+                if last_message.content:
+                    yield last_message.content
+            # --- YENİ BLOK SONU ---

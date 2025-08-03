@@ -3,7 +3,6 @@
 from ..graph_state import GraphState
 from ....services import supabase_client  # supabase_client.py dosyasını import ediyoruz
 from langchain_core.messages import AIMessage, ToolMessage
-from ..tools.validate_user_input_tool import validate_user_input_tool
 from ..tools.search_documents_tool import search_documents_tool
 
 def execute_tools(state: GraphState) -> dict:
@@ -49,10 +48,8 @@ def execute_tools(state: GraphState) -> dict:
             # === GÜVENLİK KONTROL NOKTASI ===
             # Hangi araç çağrıldıysa, ona uygun ve GÜVENLİ supabase_client fonksiyonunu çağır.
 
-            if tool_name == "validate_user_input_tool":
-                # validate_user_input_tool, kullanıcı girdisini doğrulamak için kullanılır.
-                response = validate_user_input_tool(args)
-            elif tool_name == "get_payment_amount_tool":
+            
+            if tool_name == "get_payment_amount_tool":
                 response = supabase_client.get_payment_amount(
                     order_id=args.get("order_id"),
                     user_id=user_id  # GÜVENLİK: user_id'yi state'ten ekle
