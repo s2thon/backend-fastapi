@@ -10,16 +10,13 @@ from ..services.langgraph_agent.graph_state import GraphState
 from ..services.langgraph_agent import run_langgraph_chat_async
 from langchain_core.messages import HumanMessage
 
-router = APIRouter(
-    prefix="/chat",
-    tags=["Chatbot (LangGraph)"]
-)
+router = APIRouter()
 
 class ChatRequest(BaseModel):
     message: str
 
-# Endpoint artık Spring Boot'tan gelen /api/ai/chat/invoke isteğini karşılayacak
-@router.post("/invoke")
+# Endpoint artık Spring Boot'tan gelen /api/ai/chat-invoke isteğini karşılayacak
+@router.post("/chat-invoke", tags=["Chatbot (LangGraph)"])
 async def invoke_chat_stream(
     request: ChatRequest,
     # YENİ: Token'ı doğrulayan ve kullanıcı bilgilerini getiren güvenlik bağımlılığı
@@ -43,7 +40,7 @@ async def invoke_chat_stream(
             media_type="text/plain; charset=utf-8"
         )
     except Exception as e:
-        print(f"Hata - /chat/invoke: {e}")
+        print(f"Hata - /chat-invoke: {e}")
         return StreamingResponse(
             ["Üzgünüz, isteğiniz işlenirken bir hata oluştu."], 
             status_code=500,
