@@ -27,11 +27,11 @@ def initialize_clients():
     # --- Psycopg2 Bağlantı Havuzunu Başlat ---
     if db_pool is None:
         try:
-            user = os.getenv("USER")
-            password = os.getenv("PASSWORD")
-            host = os.getenv("HOST")
+            user = os.getenv("DB_USER")
+            password = os.getenv("DB_PASSWORD")
+            host = os.getenv("DB_HOST")
             port = os.getenv("DB_PORT")
-            dbname = os.getenv("DBNAME")
+            dbname = os.getenv("DB_NAME")
 
             if not all([user, password, host, port, dbname]):
                 raise ValueError("USER, PASSWORD, HOST, DB_PORT ve DBNAME .env dosyasında tanımlı olmalı!")
