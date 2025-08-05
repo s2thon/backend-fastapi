@@ -6,7 +6,7 @@ from ..services.price_analyzer import analyze_product_price
 # YENİ: Güvenlik bağımlılığı importu
 from ..services.langgraph_agent.security import get_current_user_claims, UserClaims
 
-router = APIRouter()
+router = APIRouter(prefix="/ai", tags=["AI Services"])
 
 class PriceRequest(BaseModel):
     product_name: str

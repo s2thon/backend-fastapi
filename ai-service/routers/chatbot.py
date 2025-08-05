@@ -11,7 +11,7 @@ from ..services.langgraph_agent.graph_state import GraphState
 from ..services.langgraph_agent import run_langgraph_chat_async
 from langchain_core.messages import HumanMessage
 
-router = APIRouter()
+router = APIRouter(prefix="/ai", tags=["AI Services"])
 
 class ChatRequest(BaseModel):
     message: str

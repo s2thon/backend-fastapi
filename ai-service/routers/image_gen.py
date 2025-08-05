@@ -9,7 +9,7 @@ from ..services.supabase_client import get_or_upload_image_url
 # YENİ: Güvenlik bağımlılığı importu
 from ..services.langgraph_agent.security import get_current_user_claims, UserClaims
 
-router = APIRouter()
+router = APIRouter(prefix="/ai", tags=["AI Services"])
 
 class PreviewRequest(BaseModel):
     product_name: str
