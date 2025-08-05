@@ -30,12 +30,12 @@ def initialize_clients():
             user = os.getenv("USER")
             password = os.getenv("PASSWORD")
             host = os.getenv("HOST")
-            port = os.getenv("PORT")
+            port = os.getenv("DB_PORT")
             dbname = os.getenv("DBNAME")
 
             if not all([user, password, host, port, dbname]):
-                raise ValueError("USER, PASSWORD, HOST, PORT ve DBNAME .env dosyasında tanımlı olmalı!")
-            
+                raise ValueError("USER, PASSWORD, HOST, DB_PORT ve DBNAME .env dosyasında tanımlı olmalı!")
+
 
             # --- ANA DÜZELTME BURADA ---
             # Şifredeki '@' gibi özel karakterleri güvenli formata dönüştür.
