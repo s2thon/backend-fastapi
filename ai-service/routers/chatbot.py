@@ -53,6 +53,10 @@ async def invoke_chat_stream(
             "suggestions": [] # Örnek öneriler
         }
 
+        # YENİ: LOGLAMA ADIMI
+        # Spring Boot'a göndermeden hemen önce ne oluşturduğumuzu loglayalım.
+        print(f"--> FastAPI'den gönderilen yanıt: {final_response_obj}")
+
         # 4. StreamingResponse yerine, oluşturduğumuz JSON nesnesini döndür.
         return JSONResponse(content=final_response_obj)
     
