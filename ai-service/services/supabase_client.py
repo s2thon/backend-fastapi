@@ -43,7 +43,7 @@ def initialize_clients():
 
             db_url = f"postgresql://{user}:{encoded_password}@{host}:{port}/{dbname}"
 
-            db_pool = SimpleConnectionPool(minconn=1, maxconn=10, dsn=db_url)
+            db_pool = SimpleConnectionPool(minconn=1, maxconn=5, dsn=db_url)
             print("✅ Veritabanı bağlantı havuzu (psycopg2) başarıyla başlatıldı.")
         except (ValueError, psycopg2.Error) as e:
             print(f"❌ Veritabanı bağlantı havuzu başlatılamadı: {e}")
